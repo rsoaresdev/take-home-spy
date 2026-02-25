@@ -1,0 +1,11 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+
+# Mobile
+app/node_modules/
+app/.expo/

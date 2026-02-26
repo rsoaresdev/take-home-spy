@@ -17,7 +17,11 @@ Including another URLconf
 
 from django.contrib import admin
 from django.urls import path
+from reports.api import api
+from reports.views import dashboard
 
 urlpatterns = [
+    path("", dashboard, name="dashboard"),
     path("admin/", admin.site.urls),
+    path("api/v1/", api.urls),
 ]

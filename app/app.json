@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "app",
-    "slug": "app",
+    "name": "PureSky",
+    "slug": "puresky",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -13,17 +13,38 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "bundleIdentifier": "com.rsoares.puresky",
+      "supportsTablet": true,
+      "infoPlist": {
+        "UIBackgroundModes": ["location", "fetch"],
+        "NSLocationAlwaysUsageDescription": "A PureSky precisa de monitorizar a qualidade do ar mesmo com a app fechada para o teu histórico de saúde.",
+        "NSLocationWhenInUseUsageDescription": "A PureSky utiliza a tua localização para mostrar o AQI local.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "A monitorização contínua permite o envio de telemetria em background."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "package": "com.rsoaresdev.puresky",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION"
+      ]
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    }
+    "plugins": [
+      "expo-dev-client",
+      [
+        "expo-location",
+        {
+          "locationAlwaysPermission": "Permitir que o 'Uplink' funcione em background."
+        }
+      ],
+      "expo-background-task"
+    ]
   }
 }

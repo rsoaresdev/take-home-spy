@@ -18,6 +18,8 @@ const MIN_INTERVAL_MS = 60_000; // throttle JS: mínimo 60s entre pings
 export const defineBackgroundTask = () => {
   TaskManager.defineTask(BACKGROUND_TASK_NAME, async ({ data, error }) => {
     if (error) {
+      // kCLErrorDomain Code=0 (kCLErrorLocationUnknown) é transitório - ignorar silenciosamente
+      if (error.code === 0) return;
       console.error("❌ BG task error:", error);
       return;
     }
@@ -73,24 +75,29 @@ export const startBackgroundLocationTracking = async () => {
       console.warn(
         "⚠️ Permissão de background negada. O uplink só funcionará com a app aberta.",
       );
+      return; // sem permissão "Always", iOS não entrega updates em background
     }
+    console.log("✅ Permissão de background:", status);
 
-    // Limpar task antiga se existir (evita conflitos após reinstall)
+    // Sempre re-registar para garantir que os parâmetros estão atualizados
     const isRegistered =
       await TaskManager.isTaskRegisteredAsync(BACKGROUND_TASK_NAME);
     if (isRegistered) {
-      console.log("ℹ️ Background task já ativa");
-      return;
+      console.log("ℹ️ A re-registar background task com novos parâmetros...");
+      await Location.stopLocationUpdatesAsync(BACKGROUND_TASK_NAME);
     }
 
     await Location.startLocationUpdatesAsync(BACKGROUND_TASK_NAME, {
-      accuracy: Location.Accuracy.Low, // sem GPS chip ativo - menos triggers
-      // deferredUpdatesInterval: iOS só entrega ao JS de 60 em 60s
+      // Balanced = kCLLocationAccuracyHundredMeters - usa GPS,
+      // mais fiável que Low para manter updates em background no iOS
+      accuracy: Location.Accuracy.Balanced,
+      distanceInterval: 0, // receber todas as atualizações, throttle no JS
       deferredUpdatesInterval: MIN_INTERVAL_MS,
-      deferredUpdatesDistance: 100, // iOS: só entrega se moveu ≥100m no período
-      // distanceInterval: 100m — elimina jitter GPS e minimiza execuções nativas
-      distanceInterval: 100,
-      showsBackgroundLocationIndicator: false, // sem indicador azul no iOS
+      deferredUpdatesDistance: 0, // sem filtro de distância nos deferred updates
+      showsBackgroundLocationIndicator: false,
+      // CRÍTICO: impedir iOS de pausar location updates em background
+      pausesLocationUpdatesAutomatically: false,
+      activityType: Location.ActivityType.Other,
       foregroundService: {
         notificationTitle: "PureSky",
         notificationBody: "A monitorizar a qualidade do ar",

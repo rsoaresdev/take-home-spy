@@ -1,21 +1,28 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import {
   View,
   Text,
   ActivityIndicator,
   Platform,
-  TouchableOpacity,
+  Pressable,
   FlatList,
   Modal,
+  PanResponder,
+  Dimensions,
+  StyleSheet,
 } from "react-native";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
+  withSpring,
+  runOnJS,
+  FadeIn,
 } from "react-native-reanimated";
-import { scheduleOnRN } from "react-native-worklets";
 import MapView, { Marker, Polyline } from "react-native-maps";
 import * as Location from "expo-location";
+import { setStatusBarStyle } from "expo-status-bar";
+import { useFocusEffect } from "@react-navigation/native";
 import { BACKEND_URL } from "../constants/config";
 
 /**
@@ -29,25 +36,63 @@ export default function HistoryMapScreen() {
   const [currentLocation, setCurrentLocation] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const mapRef = useRef(null);
-  const slideAnim = useSharedValue(500); // começa fora do ecrã (baixo)
 
-  const animatedModalStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: slideAnim.value }],
+  useFocusEffect(
+    useCallback(() => {
+      setStatusBarStyle("dark");
+    }, []),
+  );
+  const DRAWER_HEIGHT = Dimensions.get("window").height * 0.7;
+  const DISMISS_THRESHOLD = 120;
+  const slideAnim = useSharedValue(DRAWER_HEIGHT);
+  const backdropOpacity = useSharedValue(0);
+
+  const animatedDrawerStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: Math.max(0, slideAnim.value) }],
   }));
 
-  const openModal = () => {
-    setModalVisible(true);
-    slideAnim.value = 500;
-    slideAnim.value = withTiming(0, { duration: 320 });
-  };
+  const animatedBackdropStyle = useAnimatedStyle(() => ({
+    opacity: backdropOpacity.value,
+  }));
 
-  const closeModal = () => {
-    slideAnim.value = withTiming(500, { duration: 260 }, (finished) => {
-      if (finished) {
-        scheduleOnRN(setModalVisible, false);
-      }
+  const openModal = useCallback(() => {
+    setModalVisible(true);
+    slideAnim.value = DRAWER_HEIGHT;
+    slideAnim.value = withSpring(0, { damping: 28, stiffness: 220 });
+    backdropOpacity.value = withTiming(1, { duration: 300 });
+  }, []);
+
+  const closeModal = useCallback(() => {
+    slideAnim.value = withTiming(DRAWER_HEIGHT, { duration: 250 });
+    backdropOpacity.value = withTiming(0, { duration: 250 }, () => {
+      runOnJS(setModalVisible)(false);
     });
-  };
+  }, []);
+
+  // PanResponder for swipe-down-to-dismiss on the drawer handle
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => gestureState.dy > 8,
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dy > 0) {
+          slideAnim.value = gestureState.dy;
+          backdropOpacity.value = Math.max(
+            0,
+            1 - gestureState.dy / DRAWER_HEIGHT,
+          );
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy > DISMISS_THRESHOLD || gestureState.vy > 0.5) {
+          closeModal();
+        } else {
+          slideAnim.value = withSpring(0, { damping: 28, stiffness: 220 });
+          backdropOpacity.value = withTiming(1, { duration: 150 });
+        }
+      },
+    }),
+  ).current;
 
   useEffect(() => {
     fetchHistory();
@@ -77,7 +122,10 @@ export default function HistoryMapScreen() {
       setLoading(true);
       setError(null);
 
-      console.log("🔍 A procurar histórico de:", `${BACKEND_URL}/api/v1/history`);
+      console.log(
+        "🔍 A procurar histórico de:",
+        `${BACKEND_URL}/api/v1/history`,
+      );
       const response = await fetch(`${BACKEND_URL}/api/v1/history`);
 
       if (!response.ok) {
@@ -95,43 +143,76 @@ export default function HistoryMapScreen() {
     }
   };
 
-  const centerOnCurrentLocation = () => {
-    if (currentLocation && mapRef.current) {
-      mapRef.current.animateToRegion(
-        {
-          latitude: currentLocation.latitude,
-          longitude: currentLocation.longitude,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
-        },
-        500,
-      );
+  const centerOnCurrentLocation = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") return;
+
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      const coords = {
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      };
+
+      setCurrentLocation(coords);
+
+      if (mapRef.current) {
+        mapRef.current.animateToRegion(
+          {
+            ...coords,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+          },
+          500,
+        );
+      }
+    } catch (err) {
+      console.error("Erro ao centrar no local atual:", err);
     }
   };
 
   if (loading) {
     return (
-      <View className="flex-1 justify-center items-center bg-slate-900 p-5">
-        <ActivityIndicator size="large" color="#64748b" />
-        <Text className="mt-4 text-base text-slate-400">A carregar histórico...</Text>
+      <View className="flex-1 justify-center items-center bg-slate-950 px-8">
+        <ActivityIndicator size="large" color="#475569" />
+        <Text className="mt-5 text-sm text-slate-500 tracking-wide">
+          A carregar histórico...
+        </Text>
       </View>
     );
   }
 
   if (error) {
     return (
-      <View className="flex-1 justify-center items-center bg-slate-900 p-5">
-        <Text className="text-2xl font-bold text-red-500 mb-2">⚠️ Erro</Text>
-        <Text className="text-sm text-slate-400 text-center">{error}</Text>
+      <View className="flex-1 justify-center items-center bg-slate-950 px-8">
+        <Text className="text-4xl mb-3">⚠️</Text>
+        <Text className="text-lg font-bold text-red-400 mb-2">Erro</Text>
+        <Text className="text-sm text-slate-500 text-center leading-5">
+          {error}
+        </Text>
+        <Pressable
+          className="mt-6 bg-slate-800 rounded-xl px-6 py-3 border border-slate-700"
+          onPress={fetchHistory}
+        >
+          <Text className="text-sm font-semibold text-slate-300">
+            Tentar novamente
+          </Text>
+        </Pressable>
       </View>
     );
   }
 
   if (history.length === 0) {
     return (
-      <View className="flex-1 justify-center items-center bg-slate-900 p-5">
-        <Text className="text-2xl font-bold text-slate-500 mb-2">📍 Sem histórico</Text>
-        <Text className="text-sm text-slate-400 text-center">
+      <View className="flex-1 justify-center items-center bg-slate-950 px-8">
+        <Text className="text-4xl mb-3">📍</Text>
+        <Text className="text-lg font-bold text-slate-500 mb-2">
+          Sem histórico
+        </Text>
+        <Text className="text-sm text-slate-600 text-center">
           Nenhum registo encontrado
         </Text>
       </View>
@@ -169,8 +250,8 @@ export default function HistoryMapScreen() {
   };
 
   const renderListItem = ({ item, index }) => (
-    <TouchableOpacity
-      className="bg-slate-800/60 rounded-2xl p-4 mb-3 border border-slate-600/20"
+    <Pressable
+      className="bg-slate-800/50 rounded-2xl p-4 mb-2.5 border border-white/[0.06] active:bg-slate-700/50"
       onPress={() => {
         if (mapRef.current) {
           mapRef.current.animateToRegion(
@@ -183,19 +264,28 @@ export default function HistoryMapScreen() {
             500,
           );
         }
+        closeModal();
       }}
     >
       <View className="flex-row justify-between items-center mb-2">
-        <View className="flex-row items-center">
+        <View className="flex-row items-center gap-2">
           <View
-            className="w-3 h-3 rounded-full mr-2"
+            className="w-2.5 h-2.5 rounded-full"
             style={{ backgroundColor: getMarkerColor(item.aqi_value) }}
           />
-          <Text className="text-base font-bold text-slate-50">AQI {item.aqi_value}</Text>
+          <Text className="text-base font-bold text-white">
+            AQI {item.aqi_value}
+          </Text>
         </View>
-        <Text className="text-xs text-slate-500 font-semibold">#{index + 1}</Text>
+        <View className="bg-slate-700/50 rounded-lg px-2 py-0.5">
+          <Text className="text-[10px] text-slate-500 font-semibold">
+            #{index + 1}
+          </Text>
+        </View>
       </View>
-      <Text className="text-sm text-slate-400 mb-1.5">{formatDateLong(item.created_at)}</Text>
+      <Text className="text-[13px] text-slate-400 mb-1.5">
+        {formatDateLong(item.created_at)}
+      </Text>
       <Text
         className="text-xs text-slate-500 mb-1"
         style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}
@@ -208,7 +298,7 @@ export default function HistoryMapScreen() {
       >
         🔧 {item.device_id}
       </Text>
-    </TouchableOpacity>
+    </Pressable>
   );
 
   // Usar currentLocation como default se existir, senão usar história
@@ -244,7 +334,7 @@ export default function HistoryMapScreen() {
   }));
 
   return (
-    <View className="flex-1 bg-slate-900">
+    <View className="flex-1 bg-slate-950">
       <MapView
         ref={mapRef}
         style={{ flex: 1 }}
@@ -257,9 +347,9 @@ export default function HistoryMapScreen() {
         {history.length > 1 && (
           <Polyline
             coordinates={polylineCoords}
-            strokeColor="#64748b"
-            strokeWidth={2}
-            lineDashPattern={[5, 5]}
+            strokeColor="#475569"
+            strokeWidth={1.5}
+            lineDashPattern={[6, 4]}
           />
         )}
 
@@ -280,24 +370,36 @@ export default function HistoryMapScreen() {
 
       {/* Controlos flutuantes */}
       <View
-        className="absolute right-5 gap-3"
+        className="absolute right-4 gap-2.5"
         style={{ bottom: Platform.OS === "ios" ? 100 : 80 }}
       >
-        <TouchableOpacity
-          className="w-14 h-14 rounded-full bg-slate-950/95 border border-slate-600/30 justify-center items-center"
-          style={{ shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8 }}
+        <Pressable
+          className="w-12 h-12 rounded-2xl bg-slate-950/90 border border-white/[0.08] justify-center items-center active:bg-slate-800/90"
+          style={{
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.35,
+            shadowRadius: 10,
+            elevation: 10,
+          }}
           onPress={centerOnCurrentLocation}
         >
-          <Text className="text-2xl">📍</Text>
-        </TouchableOpacity>
+          <Text className="text-lg">📍</Text>
+        </Pressable>
 
-        <TouchableOpacity
-          className="w-14 h-14 rounded-full bg-slate-950/95 border border-slate-600/30 justify-center items-center"
-          style={{ shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8 }}
+        <Pressable
+          className="w-12 h-12 rounded-2xl bg-slate-950/90 border border-white/[0.08] justify-center items-center active:bg-slate-800/90"
+          style={{
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.35,
+            shadowRadius: 10,
+            elevation: 10,
+          }}
           onPress={openModal}
         >
-          <Text className="text-2xl">📋</Text>
-        </TouchableOpacity>
+          <Text className="text-lg">📋</Text>
+        </Pressable>
       </View>
 
       {/* Modal com lista */}
@@ -305,18 +407,51 @@ export default function HistoryMapScreen() {
         visible={modalVisible}
         animationType="none"
         transparent={true}
+        statusBarTranslucent
         onRequestClose={closeModal}
       >
-        <View className="flex-1 bg-black/70 justify-end">
+        <View style={{ flex: 1 }}>
+          {/* Semi-transparent backdrop */}
           <Animated.View
-            className="bg-slate-900 rounded-tl-3xl rounded-tr-3xl border-t border-slate-600/20"
-            style={[{ height: "75%" }, animatedModalStyle]}
+            style={[
+              {
+                ...StyleSheet.absoluteFillObject,
+                backgroundColor: "rgba(0,0,0,0.6)",
+              },
+              animatedBackdropStyle,
+            ]}
           >
-            <View className="flex-row justify-between items-center p-5 border-b border-slate-600/20">
-              <Text className="text-xl font-bold text-slate-50">Histórico Completo</Text>
-              <TouchableOpacity onPress={closeModal}>
-                <Text className="text-3xl text-slate-400 font-light">✕</Text>
-              </TouchableOpacity>
+            <Pressable style={{ flex: 1 }} onPress={closeModal} />
+          </Animated.View>
+
+          {/* Drawer */}
+          <Animated.View
+            style={[
+              {
+                position: "absolute",
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: DRAWER_HEIGHT,
+                backgroundColor: "#020617",
+                borderTopLeftRadius: 24,
+                borderTopRightRadius: 24,
+                borderTopWidth: 1,
+                borderTopColor: "rgba(255,255,255,0.08)",
+                overflow: "hidden",
+              },
+              animatedDrawerStyle,
+            ]}
+          >
+            {/* Drag handle + header — both draggable */}
+            <View {...panResponder.panHandlers}>
+              <View className="items-center pt-3 pb-2">
+                <View className="w-10 h-1 rounded-full bg-slate-700" />
+              </View>
+
+              <View className="flex-row justify-between items-center px-5 py-2 border-b border-white/[0.06]">
+                <Text className="text-lg font-bold text-white">Histórico</Text>
+              </View>
             </View>
 
             <FlatList
@@ -326,6 +461,7 @@ export default function HistoryMapScreen() {
               }
               renderItem={renderListItem}
               contentContainerStyle={{ padding: 16 }}
+              showsVerticalScrollIndicator={false}
             />
           </Animated.View>
         </View>
@@ -333,6 +469,3 @@ export default function HistoryMapScreen() {
     </View>
   );
 }
-
-
-

@@ -6,9 +6,10 @@ import {
   ScrollView,
   RefreshControl,
 } from "react-native";
-import Animated, { FadeInUp, ZoomIn } from "react-native-reanimated";
+import Animated, { FadeInUp, ZoomIn, FadeIn } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
-import { StatusBar } from "expo-status-bar";
+import { setStatusBarStyle } from "expo-status-bar";
+import { useFocusEffect } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Location from "expo-location";
 import { useAirQuality } from "../hooks/useAirQuality";
@@ -33,6 +34,12 @@ export default function HomeScreen() {
   const gradientColors = getGradientColors(aqi);
   const aqiDisplay = formatAqiValue(aqi);
   const aqiDescription = getAqiDescription(aqi);
+
+  useFocusEffect(
+    useCallback(() => {
+      setStatusBarStyle("light");
+    }, []),
+  );
 
   // Handler para toggle do uplink
   const handleUplinkToggle = useCallback(
@@ -92,8 +99,7 @@ export default function HomeScreen() {
   }, [refreshAirQuality, showToast]);
 
   return (
-    <View style={{ flex: 1 }}>
-      <StatusBar style="light" />
+    <View className="flex-1">
 
       {/* Gradiente de fundo baseado no AQI */}
       <LinearGradient
@@ -115,92 +121,38 @@ export default function HomeScreen() {
           />
         }
       >
-        <SafeAreaView style={{ flex: 1 }}>
+        <SafeAreaView className="flex-1">
           {/* Top bar */}
           <Animated.View
             entering={FadeInUp.duration(500)}
-            style={{
-              paddingHorizontal: 24,
-              paddingTop: 8,
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
+            className="px-6 pt-2 flex-row justify-between items-center"
           >
-            <Text
-              style={{
-                color: "rgba(255,255,255,0.6)",
-                fontSize: 10,
-                letterSpacing: 6,
-                textTransform: "uppercase",
-                fontWeight: "600",
-              }}
-            >
+            <Text className="text-white/50 text-[10px] tracking-[6px] uppercase font-semibold">
               PureSky
             </Text>
           </Animated.View>
 
           {/* Área principal */}
-          <View
-            style={{
-              flex: 1,
-              alignItems: "center",
-              justifyContent: "center",
-              paddingHorizontal: 32,
-            }}
-          >
+          <View className="flex-1 items-center justify-center px-8">
             {/* Anel decorativo + AQI */}
             <AnimatedPressable
               entering={ZoomIn.duration(700).springify()}
               onPress={handleTap}
-              style={{ alignItems: "center", justifyContent: "center" }}
+              className="items-center justify-center"
             >
               {/* Anel exterior */}
-              <View
-                style={{
-                  width: 240,
-                  height: 240,
-                  borderRadius: 120,
-                  borderWidth: 1,
-                  borderColor: "rgba(255,255,255,0.08)",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
+              <View className="w-60 h-60 rounded-full border border-white/[0.08] items-center justify-center">
                 {/* Anel interior */}
-                <View
-                  style={{
-                    width: 208,
-                    height: 208,
-                    borderRadius: 104,
-                    borderWidth: 1,
-                    borderColor: "rgba(255,255,255,0.12)",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    backgroundColor: "rgba(0,0,0,0.12)",
-                  }}
-                >
+                <View className="w-52 h-52 rounded-full border border-white/[0.12] items-center justify-center bg-black/[0.12]">
                   <Text
-                    style={{
-                      fontSize: 96,
-                      fontWeight: "900",
-                      color: showVisualIndicator ? "#ef4444" : "white",
-                      lineHeight: 100,
-                      textAlign: "center",
-                      letterSpacing: -4,
-                    }}
+                    className={`text-[96px] font-black leading-[100px] text-center ${
+                      showVisualIndicator ? "text-red-500" : "text-white"
+                    }`}
+                    style={{ letterSpacing: -4 }}
                   >
                     {aqiDisplay || "--"}
                   </Text>
-                  <Text
-                    style={{
-                      color: "rgba(255,255,255,0.55)",
-                      fontSize: 10,
-                      letterSpacing: 5,
-                      textTransform: "uppercase",
-                      marginTop: 2,
-                    }}
-                  >
+                  <Text className="text-white/50 text-[10px] tracking-[5px] uppercase mt-0.5">
                     índice
                   </Text>
                 </View>
@@ -210,24 +162,9 @@ export default function HomeScreen() {
             {/* Badge de qualidade */}
             <Animated.View
               entering={FadeInUp.delay(200).duration(500)}
-              style={{
-                marginTop: 28,
-                paddingVertical: 8,
-                paddingHorizontal: 24,
-                borderRadius: 100,
-                backgroundColor: "rgba(255,255,255,0.1)",
-                borderWidth: 1,
-                borderColor: "rgba(255,255,255,0.18)",
-              }}
+              className="mt-7 py-2.5 px-7 rounded-full bg-white/10 border border-white/[0.18]"
             >
-              <Text
-                style={{
-                  color: "white",
-                  fontSize: 15,
-                  fontWeight: "600",
-                  letterSpacing: 0.5,
-                }}
-              >
+              <Text className="text-white text-[15px] font-semibold tracking-wide">
                 {aqiDescription}
               </Text>
             </Animated.View>
@@ -235,57 +172,24 @@ export default function HomeScreen() {
             {/* Barra de escala AQI */}
             <Animated.View
               entering={FadeInUp.delay(350).duration(500)}
-              style={{ width: "100%", marginTop: 32 }}
+              className="w-full mt-8"
             >
-              <View
-                style={{
-                  height: 4,
-                  borderRadius: 2,
-                  backgroundColor: "rgba(255,255,255,0.1)",
-                  overflow: "hidden",
-                }}
-              >
+              <View className="h-1 rounded-full bg-white/10 overflow-hidden">
                 <View
+                  className="h-full bg-white/40 rounded-full"
                   style={{
-                    height: "100%",
                     width: `${Math.min(100, ((aqi || 0) / 200) * 100)}%`,
-                    backgroundColor: "rgba(255,255,255,0.45)",
-                    borderRadius: 2,
                   }}
                 />
               </View>
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  marginTop: 6,
-                }}
-              >
-                <Text
-                  style={{
-                    color: "rgba(255,255,255,0.45)",
-                    fontSize: 9,
-                    letterSpacing: 2,
-                  }}
-                >
+              <View className="flex-row justify-between mt-1.5">
+                <Text className="text-white/40 text-[9px] tracking-[2px]">
                   BOM
                 </Text>
-                <Text
-                  style={{
-                    color: "rgba(255,255,255,0.45)",
-                    fontSize: 9,
-                    letterSpacing: 2,
-                  }}
-                >
+                <Text className="text-white/40 text-[9px] tracking-[2px]">
                   MODERADO
                 </Text>
-                <Text
-                  style={{
-                    color: "rgba(255,255,255,0.45)",
-                    fontSize: 9,
-                    letterSpacing: 2,
-                  }}
-                >
+                <Text className="text-white/40 text-[9px] tracking-[2px]">
                   MAU
                 </Text>
               </View>
@@ -295,52 +199,32 @@ export default function HomeScreen() {
           {/* Rodapé com localização */}
           <Animated.View
             entering={FadeInUp.delay(450).duration(500)}
-            style={{
-              paddingHorizontal: 24,
-              paddingBottom: 16,
-              alignItems: "center",
-              gap: 10,
-            }}
+            className="px-6 pb-20 items-center gap-2.5"
           >
             {location ? (
               <Text
-                style={{
-                  color: "rgba(255,255,255,0.6)",
-                  fontFamily: "monospace",
-                  fontSize: 10,
-                  letterSpacing: 3,
-                  textTransform: "uppercase",
-                }}
+                className="text-white/50 text-[10px] tracking-[3px] uppercase"
+                style={{ fontFamily: "monospace" }}
               >
                 {location.latitude.toFixed(4)}° N ·{" "}
                 {location.longitude.toFixed(4)}° W
               </Text>
             ) : (
-              <Text
-                style={{
-                  color: "rgba(255,255,255,0.2)",
-                  fontSize: 11,
-                  fontStyle: "italic",
-                }}
+              <Animated.Text
+                entering={FadeIn.duration(600)}
+                className="text-white/20 text-[11px] italic"
               >
                 A procurar sinal GPS...
-              </Text>
+              </Animated.Text>
             )}
-            <Text
-              style={{
-                color: "rgba(255,255,255,0.35)",
-                fontSize: 9,
-                letterSpacing: 4,
-                textTransform: "uppercase",
-              }}
-            >
+            <Text className="text-white/30 text-[9px] tracking-[4px] uppercase">
               ⬇ ARRASTE PARA ATUALIZAR
             </Text>
           </Animated.View>
         </SafeAreaView>
       </ScrollView>
 
-      {/* Toast Customizado - key força remount a cada novo toast */}
+      {/* Toast Customizado */}
       <Toast
         key={toast.key}
         visible={toast.visible}

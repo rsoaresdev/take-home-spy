@@ -1,76 +1,38 @@
-import { useState } from "react";
-import { View, Text, TouchableOpacity, Platform } from "react-native";
+import { Platform } from "react-native";
+import { createNativeBottomTabNavigator } from "@react-navigation/bottom-tabs/unstable";
 import HomeScreen from "../screens/HomeScreen";
 import HistoryMapScreen from "../screens/HistoryMapScreen";
 
+const Tab = createNativeBottomTabNavigator();
+
 export default function Navigation() {
-  const [activeTab, setActiveTab] = useState("home");
-
   return (
-    <View className="flex-1 bg-black">
-      {/* Conteúdo */}
-      <View className="flex-1">
-        {activeTab === "home" ? <HomeScreen /> : <HistoryMapScreen />}
-      </View>
-
-      {/* Tab Bar */}
-      <View
-        className="flex-row bg-slate-800 border-t border-slate-600/20"
-        style={{
-          height: Platform.OS === "ios" ? 80 : 60,
-          paddingBottom: Platform.OS === "ios" ? 20 : 0,
+    <Tab.Navigator
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: "#0A84FF",
+      }}
+    >
+      <Tab.Screen
+        name="Home"
+        component={HomeScreen}
+        options={{
+          tabBarLabel: "Início",
+          ...(Platform.OS === "ios" && {
+            tabBarIcon: { type: "sfSymbol", name: "house.fill" },
+          }),
         }}
-      >
-        <TouchableOpacity
-          className={`flex-1 justify-center items-center py-2${
-            activeTab === "home" ? " border-t-2 border-blue-500" : ""
-          }`}
-          onPress={() => setActiveTab("home")}
-          activeOpacity={0.7}
-        >
-          <Text
-            className={`text-2xl mb-1${
-              activeTab === "home" ? " opacity-100" : " opacity-50"
-            }`}
-          >
-            🏠
-          </Text>
-          <Text
-            className={`text-[11px]${
-              activeTab === "home"
-                ? " text-blue-500 font-bold"
-                : " text-slate-400 font-medium"
-            }`}
-          >
-            Início
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          className={`flex-1 justify-center items-center py-2${
-            activeTab === "history" ? " border-t-2 border-blue-500" : ""
-          }`}
-          onPress={() => setActiveTab("history")}
-          activeOpacity={0.7}
-        >
-          <Text
-            className={`text-2xl mb-1${
-              activeTab === "history" ? " opacity-100" : " opacity-50"
-            }`}
-          >
-            📍
-          </Text>
-          <Text
-            className={`text-[11px]${
-              activeTab === "history"
-                ? " text-blue-500 font-bold"
-                : " text-slate-400 font-medium"
-            }`}
-          >
-            Histórico
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+      />
+      <Tab.Screen
+        name="History"
+        component={HistoryMapScreen}
+        options={{
+          tabBarLabel: "Histórico",
+          ...(Platform.OS === "ios" && {
+            tabBarIcon: { type: "sfSymbol", name: "map.fill" },
+          }),
+        }}
+      />
+    </Tab.Navigator>
   );
 }

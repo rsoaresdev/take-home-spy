@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { View } from "react-native";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+import { NavigationContainer } from "@react-navigation/native";
 import Navigation from "./src/components/Navigation";
 import {
   startBackgroundLocationTracking,
@@ -19,10 +19,10 @@ export default function App() {
   }, []);
 
   return (
-    <SafeAreaProvider>
+    <NavigationContainer>
       <View className="flex-1 bg-black">
         <Navigation />
       </View>
-    </SafeAreaProvider>
+    </NavigationContainer>
   );
 }

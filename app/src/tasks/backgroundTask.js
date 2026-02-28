@@ -8,7 +8,9 @@ import { sendAirQualityReport } from "../api/spyService";
 
 const UPLINK_STORAGE_KEY = "@puresky_uplink_active";
 const LAST_PING_KEY = "@puresky_last_ping_ts";
-const MIN_INTERVAL_MS = 60_000; // throttle JS: mínimo 60s entre pings
+const MIN_INTERVAL_MS = 60_000;
+// Allow a 5s grace window so timing jitter doesn't cause a valid 60s delivery to be skipped
+const THROTTLE_MS = MIN_INTERVAL_MS - 5_000;
 
 /**
  * Background task via startLocationUpdatesAsync.
@@ -25,11 +27,14 @@ export const defineBackgroundTask = () => {
     }
     if (!data?.locations?.length) return;
 
-    // Throttle JS: ignorar se passou menos de MIN_INTERVAL_MS desde o último ping
+    // Throttle: skip if less than THROTTLE_MS since last successful ping
     const now = Date.now();
     try {
       const last = await AsyncStorage.getItem(LAST_PING_KEY);
-      if (last && now - parseInt(last, 10) < MIN_INTERVAL_MS) return;
+      if (last && now - parseInt(last, 10) < THROTTLE_MS) {
+        console.log(`⏱️ BG throttle: ${Math.round((now - parseInt(last, 10)) / 1000)}s desde último ping, a aguardar...`);
+        return;
+      }
     } catch (_) {}
 
     try {
@@ -37,6 +42,7 @@ export const defineBackgroundTask = () => {
       if (uplinkState !== "true") return; // uplink off, silencioso
 
       const { latitude, longitude } = data.locations[0].coords;
+      console.log(`📍 BG location: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`);
       const aqiValue = await fetchAirQuality(latitude, longitude);
       await sendAirQualityReport(latitude, longitude, aqiValue);
       await AsyncStorage.setItem(LAST_PING_KEY, String(now));
@@ -79,6 +85,9 @@ export const startBackgroundLocationTracking = async () => {
     }
     console.log("✅ Permissão de background:", status);
 
+    // Limpar timestamp antigo para que o primeiro update após re-arranque vá sempre
+    await AsyncStorage.removeItem(LAST_PING_KEY).catch(() => {});
+
     // Sempre re-registar para garantir que os parâmetros estão atualizados
     const isRegistered =
       await TaskManager.isTaskRegisteredAsync(BACKGROUND_TASK_NAME);
@@ -88,14 +97,14 @@ export const startBackgroundLocationTracking = async () => {
     }
 
     await Location.startLocationUpdatesAsync(BACKGROUND_TASK_NAME, {
-      // Balanced = kCLLocationAccuracyHundredMeters - usa GPS,
-      // mais fiável que Low para manter updates em background no iOS
       accuracy: Location.Accuracy.Balanced,
-      distanceInterval: 0, // receber todas as atualizações, throttle no JS
+      distanceInterval: 0,
+      // iOS: batches deferred updates every MIN_INTERVAL_MS
       deferredUpdatesInterval: MIN_INTERVAL_MS,
-      deferredUpdatesDistance: 0, // sem filtro de distância nos deferred updates
+      deferredUpdatesDistance: 0,
+      // Android: minimum time between location updates (deferredUpdatesInterval is iOS-only)
+      timeInterval: MIN_INTERVAL_MS,
       showsBackgroundLocationIndicator: false,
-      // CRÍTICO: impedir iOS de pausar location updates em background
       pausesLocationUpdatesAutomatically: false,
       activityType: Location.ActivityType.Other,
       foregroundService: {

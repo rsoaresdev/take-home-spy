@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const UPLINK_STORAGE_KEY = "@puresky_uplink_active";
+const LAST_PING_KEY = "@puresky_last_ping_ts";
 
 /**
  * Hook para gerir toggle persistente do uplink (5 toques para ligar/desligar)
@@ -56,6 +57,12 @@ export const useUplinkToggle = (onToggle) => {
     const newState = !isUplinkActive;
     setIsUplinkActive(newState);
     saveUplinkState(newState);
+
+    // Quando uplink é ligado, limpar timestamp para que o 1º ping vá imediatamente
+    if (newState) {
+      AsyncStorage.removeItem(LAST_PING_KEY).catch(() => {});
+      console.log("🧹 LAST_PING_KEY limpo - próximo update envia imediatamente");
+    }
 
     // Mostrar indicador visual (texto vermelho)
     setShowVisualIndicator(true);

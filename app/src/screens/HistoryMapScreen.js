@@ -6,10 +6,10 @@ import {
   Platform,
   Pressable,
   FlatList,
-  Modal,
   PanResponder,
   Dimensions,
   StyleSheet,
+  BackHandler,
 } from "react-native";
 import Animated, {
   useSharedValue,
@@ -17,9 +17,9 @@ import Animated, {
   withTiming,
   withSpring,
   runOnJS,
-  FadeIn,
 } from "react-native-reanimated";
 import MapView, { Marker, Polyline } from "react-native-maps";
+import LeafletMap from "../components/LeafletMap";
 import * as Location from "expo-location";
 import { setStatusBarStyle } from "expo-status-bar";
 import { useFocusEffect } from "@react-navigation/native";
@@ -32,15 +32,34 @@ import { BACKEND_URL } from "../constants/config";
 export default function HistoryMapScreen() {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [currentLocation, setCurrentLocation] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
-  const mapRef = useRef(null);
+  const mapRef = useRef(null);   // iOS only (react-native-maps)
+  const leafletRef = useRef(null); // Android only (WebView+Leaflet)
+
+  const animateMap = useCallback((latitude, longitude) => {
+    if (Platform.OS === "android") {
+      leafletRef.current?.animateTo(latitude, longitude, 15);
+    } else if (mapRef.current) {
+      mapRef.current.animateToRegion(
+        { latitude, longitude, latitudeDelta: 0.01, longitudeDelta: 0.01 },
+        500,
+      );
+    }
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
       setStatusBarStyle("dark");
-    }, []),
+      // Se já tem dados, faz refresh silencioso (sem spinner a cobrir o mapa)
+      if (history.length > 0) {
+        fetchHistory(false);
+      } else {
+        fetchHistory(true);
+      }
+    }, [history.length]),
   );
   const DRAWER_HEIGHT = Dimensions.get("window").height * 0.7;
   const DISMISS_THRESHOLD = 120;
@@ -95,31 +114,50 @@ export default function HistoryMapScreen() {
   ).current;
 
   useEffect(() => {
-    fetchHistory();
     getCurrentLocation();
   }, []);
 
+  // Android back button closes drawer
+  useEffect(() => {
+    if (!modalVisible) return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      closeModal();
+      return true;
+    });
+    return () => sub.remove();
+  }, [modalVisible, closeModal]);
+
+  const getCoords = async () => {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== "granted") return null;
+    // lastKnown is instant; fall back to fresh fix if unavailable
+    const last = await Location.getLastKnownPositionAsync().catch(() => null);
+    if (last?.coords) return last.coords;
+    return Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced,
+      mayShowUserSettingsDialog: false,
+    })
+      .then((l) => l.coords)
+      .catch(() => null);
+  };
+
   const getCurrentLocation = async () => {
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") return;
-
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-
-      setCurrentLocation({
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-      });
+      const coords = await getCoords();
+      if (coords)
+        setCurrentLocation({ latitude: coords.latitude, longitude: coords.longitude });
     } catch (err) {
-      console.error("Erro ao obter localização:", err);
+      console.warn("Sem localização disponível:", err.message);
     }
   };
 
-  const fetchHistory = async () => {
+  const fetchHistory = async (showFullLoader = true) => {
     try {
-      setLoading(true);
+      if (showFullLoader) {
+        setLoading(true);
+      } else {
+        setRefreshing(true);
+      }
       setError(null);
 
       console.log(
@@ -137,9 +175,13 @@ export default function HistoryMapScreen() {
       setHistory(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Erro ao buscar histórico:", err);
-      setError(err.message);
+      // Só mostra erro fatal no ecrã se for o carregamento inicial
+      if (showFullLoader) {
+        setError(err.message);
+      }
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -148,29 +190,26 @@ export default function HistoryMapScreen() {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") return;
 
-      const location = await Location.getCurrentPositionAsync({
+      // 1. Pan instantly with last known (iOS-safe, no GPS wait)
+      const last = await Location.getLastKnownPositionAsync().catch(() => null);
+      if (last?.coords) {
+        const pos = { latitude: last.coords.latitude, longitude: last.coords.longitude };
+        setCurrentLocation(pos);
+        animateMap(pos.latitude, pos.longitude);
+      }
+
+      // 2. Refine with fresh fix in the background
+      const fresh = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
-      });
-
-      const coords = {
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-      };
-
-      setCurrentLocation(coords);
-
-      if (mapRef.current) {
-        mapRef.current.animateToRegion(
-          {
-            ...coords,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
-          },
-          500,
-        );
+        mayShowUserSettingsDialog: false,
+      }).catch(() => null);
+      if (fresh?.coords) {
+        const pos = { latitude: fresh.coords.latitude, longitude: fresh.coords.longitude };
+        setCurrentLocation(pos);
+        animateMap(pos.latitude, pos.longitude);
       }
     } catch (err) {
-      console.error("Erro ao centrar no local atual:", err);
+      console.warn("Erro ao centrar:", err.message);
     }
   };
 
@@ -195,7 +234,7 @@ export default function HistoryMapScreen() {
         </Text>
         <Pressable
           className="mt-6 bg-slate-800 rounded-xl px-6 py-3 border border-slate-700"
-          onPress={fetchHistory}
+          onPress={() => fetchHistory(true)}
         >
           <Text className="text-sm font-semibold text-slate-300">
             Tentar novamente
@@ -253,17 +292,7 @@ export default function HistoryMapScreen() {
     <Pressable
       className="bg-slate-800/50 rounded-2xl p-4 mb-2.5 border border-white/[0.06] active:bg-slate-700/50"
       onPress={() => {
-        if (mapRef.current) {
-          mapRef.current.animateToRegion(
-            {
-              latitude: item.latitude,
-              longitude: item.longitude,
-              latitudeDelta: 0.01,
-              longitudeDelta: 0.01,
-            },
-            500,
-          );
-        }
+        animateMap(item.latitude, item.longitude);
         closeModal();
       }}
     >
@@ -335,38 +364,65 @@ export default function HistoryMapScreen() {
 
   return (
     <View className="flex-1 bg-slate-950">
-      <MapView
-        ref={mapRef}
-        style={{ flex: 1 }}
-        initialRegion={initialRegion}
-        mapType="standard"
-        showsUserLocation
-        showsMyLocationButton={false}
-      >
-        {/* Polyline conectando todos os pontos */}
-        {history.length > 1 && (
-          <Polyline
-            coordinates={polylineCoords}
-            strokeColor="#475569"
-            strokeWidth={1.5}
-            lineDashPattern={[6, 4]}
-          />
-        )}
-
-        {/* Marcadores para cada ponto de telemetria */}
-        {history.map((item, index) => (
-          <Marker
-            key={item.id || index}
-            coordinate={{
-              latitude: item.latitude,
-              longitude: item.longitude,
-            }}
-            pinColor={getMarkerColor(item.aqi_value)}
-            title={`AQI: ${item.aqi_value}`}
-            description={`📅 ${formatDate(item.created_at)}`}
-          />
-        ))}
-      </MapView>
+      {/* Indicador de refresh silencioso (não cobre o mapa) */}
+      {refreshing && (
+        <View
+          style={{
+            position: "absolute",
+            top: 16,
+            alignSelf: "center",
+            zIndex: 10,
+            backgroundColor: "rgba(2,6,23,0.85)",
+            borderRadius: 20,
+            paddingHorizontal: 14,
+            paddingVertical: 6,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+          <ActivityIndicator size="small" color="#475569" />
+          <Text style={{ color: "#94a3b8", fontSize: 12 }}>A atualizar...</Text>
+        </View>
+      )}
+      {Platform.OS === "android" ? (
+        <LeafletMap
+          ref={leafletRef}
+          history={history}
+          initialRegion={initialRegion}
+          style={{ flex: 1 }}
+        />
+      ) : (
+        <MapView
+          ref={mapRef}
+          style={{ flex: 1 }}
+          initialRegion={initialRegion}
+          mapType="standard"
+          showsUserLocation
+          showsMyLocationButton={false}
+        >
+          {history.length > 1 && (
+            <Polyline
+              coordinates={polylineCoords}
+              strokeColor="#475569"
+              strokeWidth={1.5}
+              lineDashPattern={[6, 4]}
+            />
+          )}
+          {history.map((item, index) => (
+            <Marker
+              key={item.id || index}
+              coordinate={{
+                latitude: item.latitude,
+                longitude: item.longitude,
+              }}
+              pinColor={getMarkerColor(item.aqi_value)}
+              title={`AQI: ${item.aqi_value}`}
+              description={`📅 ${formatDate(item.created_at)}`}
+            />
+          ))}
+        </MapView>
+      )}
 
       {/* Controlos flutuantes */}
       <View
@@ -402,24 +458,20 @@ export default function HistoryMapScreen() {
         </Pressable>
       </View>
 
-      {/* Modal com lista */}
-      <Modal
-        visible={modalVisible}
-        animationType="none"
-        transparent={true}
-        statusBarTranslucent
-        onRequestClose={closeModal}
-      >
-        <View style={{ flex: 1 }}>
+      {/* Backdrop + Drawer - rendered directly (no Modal) to avoid Android addViewAt crash */}
+      {modalVisible && (
+        <>
           {/* Semi-transparent backdrop */}
           <Animated.View
             style={[
               {
                 ...StyleSheet.absoluteFillObject,
                 backgroundColor: "rgba(0,0,0,0.6)",
+                zIndex: 20,
               },
               animatedBackdropStyle,
             ]}
+            pointerEvents={modalVisible ? "auto" : "none"}
           >
             <Pressable style={{ flex: 1 }} onPress={closeModal} />
           </Animated.View>
@@ -439,6 +491,7 @@ export default function HistoryMapScreen() {
                 borderTopWidth: 1,
                 borderTopColor: "rgba(255,255,255,0.08)",
                 overflow: "hidden",
+                zIndex: 21,
               },
               animatedDrawerStyle,
             ]}
@@ -464,8 +517,8 @@ export default function HistoryMapScreen() {
               showsVerticalScrollIndicator={false}
             />
           </Animated.View>
-        </View>
-      </Modal>
+        </>
+      )}
     </View>
   );
 }

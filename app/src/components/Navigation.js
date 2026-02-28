@@ -1,9 +1,10 @@
 import { Platform } from "react-native";
-import { createNativeBottomTabNavigator } from "@react-navigation/bottom-tabs/unstable";
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { Home, Map } from "lucide-react-native";
 import HomeScreen from "../screens/HomeScreen";
 import HistoryMapScreen from "../screens/HistoryMapScreen";
 
-const Tab = createNativeBottomTabNavigator();
+const Tab = createBottomTabNavigator();
 
 export default function Navigation() {
   return (
@@ -11,6 +12,14 @@ export default function Navigation() {
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: "#0A84FF",
+        tabBarInactiveTintColor: "#8E8E93",
+        tabBarStyle: {
+          backgroundColor: "#1C1C1E",
+          borderTopColor: "#2C2C2E",
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+        },
       }}
     >
       <Tab.Screen
@@ -18,9 +27,10 @@ export default function Navigation() {
         component={HomeScreen}
         options={{
           tabBarLabel: "Início",
-          ...(Platform.OS === "ios" && {
-            tabBarIcon: { type: "sfSymbol", name: "house.fill" },
-          }),
+          tabBarIcon:
+            Platform.OS === "ios"
+              ? { type: "sfSymbol", name: "house.fill" }
+              : ({ color, size }) => <Home color={color} size={size} />,
         }}
       />
       <Tab.Screen
@@ -28,9 +38,10 @@ export default function Navigation() {
         component={HistoryMapScreen}
         options={{
           tabBarLabel: "Histórico",
-          ...(Platform.OS === "ios" && {
-            tabBarIcon: { type: "sfSymbol", name: "map.fill" },
-          }),
+          tabBarIcon:
+            Platform.OS === "ios"
+              ? { type: "sfSymbol", name: "map.fill" }
+              : ({ color, size }) => <Map color={color} size={size} />,
         }}
       />
     </Tab.Navigator>

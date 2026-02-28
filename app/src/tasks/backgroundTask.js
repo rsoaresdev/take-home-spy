@@ -32,8 +32,7 @@ export const defineBackgroundTask = () => {
     try {
       const last = await AsyncStorage.getItem(LAST_PING_KEY);
       if (last && now - parseInt(last, 10) < THROTTLE_MS) {
-        console.log(`⏱️ BG throttle: ${Math.round((now - parseInt(last, 10)) / 1000)}s desde último ping, a aguardar...`);
-        return;
+        return; // throttle silencioso
       }
     } catch (_) {}
 
@@ -98,11 +97,12 @@ export const startBackgroundLocationTracking = async () => {
 
     await Location.startLocationUpdatesAsync(BACKGROUND_TASK_NAME, {
       accuracy: Location.Accuracy.Balanced,
-      distanceInterval: 0,
-      // iOS: batches deferred updates every MIN_INTERVAL_MS
+      // Only trigger when device moves at least 20m — prevents GPS jitter spam
+      distanceInterval: 20,
+      // iOS: batch deferred updates every MIN_INTERVAL_MS
       deferredUpdatesInterval: MIN_INTERVAL_MS,
-      deferredUpdatesDistance: 0,
-      // Android: minimum time between location updates (deferredUpdatesInterval is iOS-only)
+      deferredUpdatesDistance: 20,
+      // Android: minimum time between location updates
       timeInterval: MIN_INTERVAL_MS,
       showsBackgroundLocationIndicator: false,
       pausesLocationUpdatesAutomatically: false,

@@ -114,7 +114,7 @@
                 </div>
                 
                 <div class="flex items-center gap-2">
-                    <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full pulse-soft"></span>
+                    <span id="live-dot" class="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span>
                     <span class="text-xs text-slate-500 font-medium">Ao vivo</span>
                 </div>
             </div>
@@ -130,7 +130,7 @@
                 <div class="flex items-start justify-between">
                     <div>
                         <p class="text-[11px] text-slate-500 font-medium uppercase tracking-wider">Pings</p>
-                        <p class="text-2xl font-extrabold text-white mt-1 tracking-tight">{{ stats.total_pings }}</p>
+                        <p id="stat-pings" class="text-2xl font-extrabold text-white mt-1 tracking-tight">{{ stats.total_pings }}</p>
                     </div>
                     <div class="w-9 h-9 bg-emerald-500/10 rounded-xl flex items-center justify-center">
                         <svg class="w-4.5 h-4.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -173,7 +173,7 @@
                     <div>
                         <p class="text-[11px] text-slate-500 font-medium uppercase tracking-wider">Último ping</p>
                         {% if stats.last_location %}
-                            <p class="text-lg font-bold text-white mt-1">{{ stats.last_location.created_at|date:"H:i:s" }}</p>
+                            <p id="stat-last-time" class="text-lg font-bold text-white mt-1">{{ stats.last_location.created_at|date:"H:i:s" }}</p>
                             <p class="text-[10px] text-slate-600 font-mono mt-0.5">{{ stats.last_location.device_id|slice:":12" }}…</p>
                         {% else %}
                             <p class="text-lg font-bold text-slate-600 mt-1">—</p>
@@ -283,6 +283,7 @@
                             <tr>
                                 <th class="text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-4 py-2.5">Data/Hora</th>
                                 <th class="text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-4 py-2.5">Agente</th>
+                                <th class="text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-4 py-2.5 text-emerald-500/60">Codinome</th>
                                 <th class="text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-4 py-2.5">Dispositivo</th>
                                 <th class="text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-4 py-2.5">Lat</th>
                                 <th class="text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-4 py-2.5">Lng</th>
@@ -293,13 +294,14 @@
                         </thead>
                         <tbody class="divide-y divide-slate-800/40">
                             {% for report in reports %}
-                            <tr class="table-row transition-colors">
+                            <tr class="table-row transition-colors" data-device-id="{{ report.device_id }}">
                                 <td class="px-4 py-3 text-xs text-slate-400 font-mono">
                                     {{ report.created_at|date:"d/m H:i:s" }}
                                 </td>
                                 <td class="px-4 py-3 text-xs text-slate-400 font-mono">
                                     {{ report.device_id|slice:":15" }}{% if report.device_id|length > 15 %}…{% endif %}
                                 </td>
+                                <td class="px-4 py-3 text-[11px] font-mono font-bold text-emerald-500/70 codename-cell"></td>
                                 <td class="px-4 py-3">
                                     {% if report.device_info %}
                                     <div>
@@ -345,7 +347,7 @@
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="8" class="px-4 py-12 text-center text-slate-600 text-sm">
+                                <td colspan="9" class="px-4 py-12 text-center text-slate-600 text-sm">
                                     Sem dados. A aguardar primeiro ping…
                                 </td>
                             </tr>
@@ -425,7 +427,7 @@
                     <div style="font-size:20px;font-weight:800;color:${fillColor};margin-bottom:4px">AQI ${report.aqi_value.toFixed(0)}</div>
                     <div style="color:#94a3b8;font-size:12px">${fmt}</div>
                     <div style="color:#475569;font-size:11px;font-family:monospace;margin-top:4px">${report.latitude.toFixed(5)}, ${report.longitude.toFixed(5)}</div>
-                    <div style="color:#334155;font-size:10px;margin-top:2px">${report.device_id.substring(0, 16)}</div>
+                    <div style="color:#64748b;font-size:10px;margin-top:4px;font-family:monospace;letter-spacing:1px">🔑 ${getAgentCodename(report.device_id)}</div>
                 </div>
             `);
             
@@ -436,8 +438,122 @@
             map.fitBounds(new L.featureGroup(markers).getBounds().pad(0.1));
         }
         
-        // Auto-refresh every 30s
-        setTimeout(() => { saveMapState(); location.reload(); }, 30000);
+        // ── Spy codenames
+        function getAgentCodename(deviceId) {
+            const OPS = ['PHANTOM','COBALT','VIPER','RAVEN','CIPHER','GHOST','SPECTRE','ECHO','NOVA','ATLAS'];
+            let h = 5381;
+            for (let i = 0; i < deviceId.length; i++) {
+                h = (((h << 5) + h) ^ deviceId.charCodeAt(i)) & 0xffffffff;
+            }
+            const abs = Math.abs(h);
+            return OPS[abs % OPS.length] + '-' + String(Math.floor(abs / OPS.length) % 100).padStart(2, '0');
+        }
+
+        // Fill codenames for server-rendered rows
+        document.querySelectorAll('tr[data-device-id]').forEach(tr => {
+            const cell = tr.querySelector('.codename-cell');
+            if (cell) cell.textContent = getAgentCodename(tr.dataset.deviceId);
+        });
+
+        // ── SSE live updates (substitui reload de 30s) ────────────────
+        let pingCount = parseInt(document.getElementById('stat-pings')?.textContent || '0', 10);
+
+        function flashLiveDot() {
+            const dot = document.getElementById('live-dot');
+            if (!dot) return;
+            dot.style.transition = 'background-color 0.15s';
+            dot.style.backgroundColor = '#ffffff';
+            setTimeout(() => { dot.style.backgroundColor = '#10b981'; }, 300);
+        }
+
+        function prependTableRow(report) {
+            const tbody = document.querySelector('tbody');
+            if (!tbody) return;
+
+            // Remove "sem dados" placeholder if present
+            if (tbody.rows[0]?.cells[0]?.colSpan > 4) tbody.deleteRow(0);
+
+            const aqi = report.aqi_value;
+            let aqiClass = 'bg-emerald-500/15 text-emerald-400';
+            let statusText = 'Bom'; let statusClass = 'text-emerald-500/70';
+            if (aqi >= 100) { aqiClass = 'bg-red-500/15 text-red-400'; statusText = 'Mau'; statusClass = 'text-red-500/70'; }
+            else if (aqi >= 50) { aqiClass = 'bg-amber-500/15 text-amber-400'; statusText = 'Moderado'; statusClass = 'text-amber-500/70'; }
+
+            const date = new Date(report.created_at);
+            const fmt = date.toLocaleString('pt-PT', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' });
+            const model = report.device_info?.model || '—';
+            const os = report.device_info?.os || '';
+            const osVer = report.device_info?.osVersion || '';
+            const codename = getAgentCodename(report.device_id);
+
+            const tr = document.createElement('tr');
+            tr.className = 'table-row transition-colors';
+            tr.dataset.deviceId = report.device_id;
+            tr.style.cssText = 'opacity:0;transform:translateY(-8px);transition:opacity 0.4s,transform 0.4s';
+            tr.innerHTML = `
+                <td class="px-4 py-3 text-xs text-slate-400 font-mono">${fmt}</td>
+                <td class="px-4 py-3 text-xs text-slate-400 font-mono">${report.device_id.substring(0,15)}…</td>
+                <td class="px-4 py-3 text-[11px] font-mono font-bold text-emerald-500/70 codename-cell">${codename}</td>
+                <td class="px-4 py-3">
+                    <div><span class="text-xs font-medium text-slate-300">${model}</span>
+                    <span class="text-[10px] text-slate-600 ml-1.5">${os} ${osVer}</span></div>
+                </td>
+                <td class="px-4 py-3 text-xs text-slate-500 font-mono">${report.latitude.toFixed(4)}</td>
+                <td class="px-4 py-3 text-xs text-slate-500 font-mono">${report.longitude.toFixed(4)}</td>
+                <td class="px-4 py-3"><span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold ${aqiClass}">${Math.round(aqi)}</span></td>
+                <td class="px-4 py-3"><span class="text-[11px] ${statusClass}">${statusText}</span></td>
+                <td class="px-4 py-3">
+                    <button onclick="deleteReport(${report.id}, this)"
+                            class="text-slate-700 hover:text-red-400 transition-colors p-1 rounded-lg hover:bg-red-500/10"
+                            title="Apagar">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                    </button>
+                </td>
+            `;
+            tbody.insertBefore(tr, tbody.firstChild);
+            requestAnimationFrame(() => { tr.style.opacity = '1'; tr.style.transform = 'translateY(0)'; });
+            // Trim to 500 rows
+            while (tbody.rows.length > 500) tbody.deleteRow(tbody.rows.length - 1);
+        }
+
+        const evtSource = new EventSource('/stream/');
+        evtSource.addEventListener('message', (e) => {
+            const report = JSON.parse(e.data);
+
+            // Update stats
+            pingCount++;
+            const pingStat = document.getElementById('stat-pings');
+            if (pingStat) pingStat.textContent = pingCount;
+            const lastTimeStat = document.getElementById('stat-last-time');
+            if (lastTimeStat) {
+                lastTimeStat.textContent = new Date(report.created_at).toLocaleTimeString('pt-PT');
+            }
+
+            // Add map marker
+            let fillColor = '#10b981';
+            if (report.aqi_value >= 100) fillColor = '#ef4444';
+            else if (report.aqi_value >= 50) fillColor = '#f59e0b';
+            const m = L.circleMarker([report.latitude, report.longitude], {
+                radius: 6, fillColor, color: fillColor, weight: 1, opacity: 0.6, fillOpacity: 0.5
+            }).addTo(map);
+            const d = new Date(report.created_at);
+            const f = d.toLocaleString('pt-PT', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' });
+            m.bindPopup(`<div style="font-size:13px;line-height:1.6">
+                <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:2px;margin-bottom:6px">Relatório</div>
+                <div style="font-size:20px;font-weight:800;color:${fillColor};margin-bottom:4px">AQI ${Math.round(report.aqi_value)}</div>
+                <div style="color:#94a3b8;font-size:12px">${f}</div>
+                <div style="color:#475569;font-size:11px;font-family:monospace;margin-top:4px">${report.latitude.toFixed(5)}, ${report.longitude.toFixed(5)}</div>
+                <div style="color:#64748b;font-size:10px;margin-top:4px;font-family:monospace;letter-spacing:1px">🔑 ${getAgentCodename(report.device_id)}</div>
+            </div>`);
+            markers.push(m);
+
+            // Prepend row and flash dot
+            prependTableRow(report);
+            flashLiveDot();
+        });
+        evtSource.onerror = () => { /* EventSource auto-reconecta */ };
 
         async function deleteReport(reportId, btn) {
             if (!confirm(`Apagar registo #${reportId}?`)) return;
@@ -472,7 +588,7 @@
                 if (res.ok) {
                     const tbody = document.querySelector('tbody');
                     if (tbody) {
-                        tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-12 text-center text-slate-600 text-sm">Sem dados. A aguardar primeiro ping…</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="9" class="px-4 py-12 text-center text-slate-600 text-sm">Sem dados. A aguardar primeiro ping…</td></tr>';
                     }
                     btn.style.opacity = '1';
                     btn.disabled = false;

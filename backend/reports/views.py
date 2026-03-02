@@ -1,10 +1,10 @@
 from django.shortcuts import render
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_http_methods
+from django.http import StreamingHttpResponse
+from django.views.decorators.http import require_GET
 from django.db.models import Avg
 from django.core.serializers.json import DjangoJSONEncoder
 import json
+import time
 from datetime import datetime
 from .models import AirQualityReport
 
@@ -111,3 +111,50 @@ def dashboard(request):
     }
 
     return render(request, "reports/dashboard.html", context)
+
+
+@require_GET
+def live_stream(request):
+    """
+    SSE endpoint - transmite novos pings em tempo real para o dashboard.
+    Evita o reload de 30s e mostra dados ao vivo sem recarregar a página.
+    """
+
+    def event_stream():
+        last_id = (
+            AirQualityReport.objects.order_by("-id")
+            .values_list("id", flat=True)
+            .first()
+        ) or 0
+        # Confirma ligação imediatamente (keepalive comment)
+        yield ": connected\n\n"
+
+        while True:
+            new_reports = list(
+                AirQualityReport.objects.filter(id__gt=last_id)
+                .order_by("id")
+                .values(
+                    "id",
+                    "device_id",
+                    "device_info",
+                    "latitude",
+                    "longitude",
+                    "aqi_value",
+                    "created_at",
+                )[:10]
+            )
+            for report in new_reports:
+                last_id = report["id"]
+                report["created_at"] = report["created_at"].isoformat()
+                yield f"data: {json.dumps(report, cls=DjangoJSONEncoder)}\n\n"
+
+            time.sleep(2)
+
+    response = StreamingHttpResponse(
+        streaming_content=event_stream(),
+        content_type="text/event-stream; charset=utf-8",
+    )
+    response["Cache-Control"] = "no-cache"
+    response["X-Accel-Buffering"] = "no"
+    response["Connection"] = "keep-alive"
+    return response

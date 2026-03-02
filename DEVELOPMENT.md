@@ -6,7 +6,9 @@
 
 ## Visão Geral
 
-**PureSky** apresenta-se como uma app de qualidade do ar, mas inclui um mecanismo de tracking discreto: quando o *uplink* está activo, envia periodicamente coordenadas GPS e índice AQI para um backend central, mesmo com a app minimizada.
+**PureSky** é um monitor de qualidade do ar - e é exatamente por isso que é um disfarce perfeito.
+
+> Uma app de saúde ambiental tem uma razão *legítima* e *urgente* para pedir localização em contínuo. O utilizador concede "Permitir Sempre" de bom grado porque quer saber o AQI da sua rua, não da cidade vizinha. Ninguém questiona porque é que uma app de qualidade do ar quer acesso permanente ao GPS - é literalmente o que se espera dela.
 
 A stack é composta por:
 
@@ -107,7 +109,9 @@ Abrir no simulador com `i` ou ler o QR code com a câmara (Expo Go) ou com o Exp
 
 ## O "Secret" - Ativar o Rastreamento
 
-A app disfarça-se completamente de monitor de qualidade do ar. O rastreamento é controlado por um toggle oculto:
+A app disfarça-se completamente de monitor de qualidade do ar.
+
+> **Design intention:** o utilizador lança a app, vê um número grande e limpo — o AQI — e *nada* sugere rastreamento. Ao dar permissão "Sempre", ele acredita que está a ajudar a sua própria saúde. O uplink fica silencioso até ser ativado pelo utilizador (5 toques).
 
 ### Como activar
 
@@ -138,10 +142,11 @@ O estado persiste entre sessões via `AsyncStorage` — se a app for fechada e r
 
 Acessível em `http://localhost:8000/`:
 
-- Mapa Leaflet com todos os pontos de rasteio
-- Tabela com histórico completo, filtros por device model
+- **Mapa Leaflet ao vivo** — novos pings aparecem como marcadores em tempo real via SSE (Server-Sent Events), sem recarregar a página
+- **Codinomes de agente** — cada `device_id` é mapeado para um codinome operacional (ex: `COBALT-07`, `PHANTOM-23`) gerado deterministicamente por hash — o 'hacker' vê spycraft, não UUIDs
+- Tabela com histórico completo e filtros por device model
 - Botão de eliminar registos individuais ou todos
-- Auto-reload a cada 30s com preservação da posição do mapa
+- Contador de pings e hora do último ping atualizam-se em direto (sem refresh)
 
 ---
 
@@ -198,6 +203,12 @@ Acessível em `http://localhost:8000/`:
 ---
 
 ## Trade-offs e Decisões Técnicas
+
+### A escolha do disfarce: AQI vs. "Cat Spotter"
+Uma app de monitorização de qualidade do ar é um disfarce **estrategicamente superior** a uma app de gatos ou calculadora. A razão é simples: utilizadores de apps de saúde concedem `NSLocationAlwaysAndWhenInUseUsageDescription` sem hesitar - percebem que faz sentido para a funcionalidade principal. O iOS mostra o banner de localização em background, mas o utilizador já o aceitou como parte do contrato. Um jogo que pede localização "Always Allow" levanta suspeitas imediatas.
+
+### SSE vs. WebSocket vs. polling
+O dashboard usa **Server-Sent Events** (SSE) em vez de reload automático a cada 30s. SSE é unidirecional (server → client), sem overhead de WebSocket, e funciona nativamente no browser sem bibliotecas. Para um dashboard read-only de telemetria é a escolha correta. Trade-off: o dev server do Django usa threads síncronas, pelo que cada ligação SSE ocupa uma thread — aceitável para demo, em produção usaria Gunicorn/uvicorn com workers async.
 
 ### Background Location vs Background Fetch
 A abordagem inicial usava `expo-background-fetch` / `expo-background-task`, que utiliza o mecanismo de *Background App Refresh* do iOS. Este só corre quando o iOS decide (tipicamente 15+ minutos em produção). Para o cenário de "app minimizada", a única API que funciona de forma fiável é `startLocationUpdatesAsync`, que usa o daemon nativo de localização para acordar o processo JS. O trade-off é que requer permissão *"Always Allow"* em vez de *"While Using"*.

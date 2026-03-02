@@ -8,7 +8,7 @@ import type { PingResponse } from "../types";
 export const sendAirQualityReport = async (
   latitude: number,
   longitude: number,
-  aqiValue: number,
+  aqiValue?: number,
 ): Promise<PingResponse> => {
   const deviceInfo = getDeviceInfo();
 
@@ -20,7 +20,7 @@ export const sendAirQualityReport = async (
       device_info: deviceInfo,
       latitude,
       longitude,
-      aqi_value: aqiValue,
+      ...(aqiValue !== undefined && { aqi_value: aqiValue }),
     }),
   });
 

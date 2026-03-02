@@ -3,7 +3,6 @@ import * as Location from "expo-location";
 import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { BACKGROUND_TASK_NAME } from "../constants/config";
-import { fetchAirQuality } from "../api/openMeteoService";
 import { sendAirQualityReport } from "../api/spyService";
 
 const UPLINK_STORAGE_KEY = "@puresky_uplink_active";
@@ -11,10 +10,6 @@ const LAST_PING_KEY = "@puresky_last_ping_ts";
 const MIN_INTERVAL_MS = 60_000;
 // Allow a 5s grace window so timing jitter doesn't cause a valid 60s delivery to be skipped
 const THROTTLE_MS = MIN_INTERVAL_MS - 5_000;
-
-// In-memory lock: prevents concurrent task executions from racing past the
-// AsyncStorage throttle check before any one of them can write the timestamp.
-let isSending = false;
 
 /**
  * Background task via startLocationUpdatesAsync.
@@ -41,16 +36,12 @@ export const defineBackgroundTask = (): void => {
         | undefined;
       if (!locations?.length) return;
 
-      // Fast in-memory guard: if another execution is already in-flight, skip.
-      if (isSending) return;
-
       const now = Date.now();
       try {
         const last = await AsyncStorage.getItem(LAST_PING_KEY);
         if (last && now - parseInt(last, 10) < THROTTLE_MS) return;
       } catch (_) {}
 
-      isSending = true;
       try {
         const uplinkState = await AsyncStorage.getItem(UPLINK_STORAGE_KEY);
         if (uplinkState !== "true") return;
@@ -59,17 +50,15 @@ export const defineBackgroundTask = (): void => {
         console.log(
           `📍 BG location: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`,
         );
-        const aqiValue = await fetchAirQuality(latitude, longitude);
-        await sendAirQualityReport(latitude, longitude, aqiValue);
+        // AQI é obtido pelo backend para não bloquear a thread em background no iOS
+        await sendAirQualityReport(latitude, longitude);
         await AsyncStorage.setItem(LAST_PING_KEY, String(now));
         console.log(
-          `✅ BG sync: AQI ${aqiValue} @ ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
+          `✅ BG sync @ ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
         );
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         console.warn("⚠️ BG task erro:", message);
-      } finally {
-        isSending = false;
       }
     },
   );

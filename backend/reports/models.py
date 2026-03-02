@@ -6,7 +6,7 @@ class AirQualityReport(models.Model):
     device_info = models.JSONField(null=True, blank=True, default=dict)
     latitude = models.FloatField()
     longitude = models.FloatField()
-    aqi_value = models.FloatField()
+    aqi_value = models.FloatField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

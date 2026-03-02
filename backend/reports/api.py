@@ -2,7 +2,27 @@ from ninja import NinjaAPI, Schema
 from ninja.responses import Response
 from datetime import datetime
 from typing import Optional
+from urllib.request import urlopen
+from urllib.error import URLError
+from urllib.parse import urlencode
+import json as _json
 from .models import AirQualityReport
+
+
+def _fetch_aqi(latitude: float, longitude: float) -> Optional[float]:
+    """Obtém AQI no open-meteo (executado server-side). Retorna None em caso de erro."""
+    try:
+        params = urlencode({
+            "latitude": latitude,
+            "longitude": longitude,
+            "current": "european_aqi",
+        })
+        url = f"https://air-quality-api.open-meteo.com/v1/air-quality?{params}"
+        with urlopen(url, timeout=10) as resp:
+            data = _json.loads(resp.read())
+        return data.get("current", {}).get("european_aqi")
+    except (URLError, Exception):
+        return None
 
 
 # Inicializar Django Ninja API
@@ -16,10 +36,10 @@ api = NinjaAPI(
 # Schemas para validação de dados
 class PingRequest(Schema):
     device_id: str
-    device_info: dict = None  # Opcional: {"model": "iPhone 15", "os": "iOS 17.1", "app_version": "1.0.0"}
+    device_info: Optional[dict] = None  # Opcional: {"model": "iPhone 15", "os": "iOS 17.1", "app_version": "1.0.0"}
     latitude: float
     longitude: float
-    aqi_value: float
+    aqi_value: Optional[float] = None  # Se omitido, o backend busca no open-meteo
 
 
 class PingResponse(Schema):
@@ -33,7 +53,7 @@ class HistoryResponse(Schema):
     device_id: str
     latitude: float
     longitude: float
-    aqi_value: float
+    aqi_value: Optional[float]
     created_at: datetime
 
 
@@ -43,12 +63,16 @@ def receive_ping(request, payload: PingRequest):
     Recebe dados de qualidade do ar dos dispositivos móveis
     """
     try:
+        aqi = payload.aqi_value
+        if aqi is None:
+            aqi = _fetch_aqi(payload.latitude, payload.longitude)
+
         report = AirQualityReport.objects.create(
             device_id=payload.device_id,
             device_info=payload.device_info or {},
             latitude=payload.latitude,
             longitude=payload.longitude,
-            aqi_value=payload.aqi_value,
+            aqi_value=aqi,
         )
 
         return {

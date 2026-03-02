@@ -12,6 +12,10 @@ const MIN_INTERVAL_MS = 60_000;
 // Allow a 5s grace window so timing jitter doesn't cause a valid 60s delivery to be skipped
 const THROTTLE_MS = MIN_INTERVAL_MS - 5_000;
 
+// In-memory lock: prevents concurrent task executions from racing past the
+// AsyncStorage throttle check before any one of them can write the timestamp.
+let isSending = false;
+
 /**
  * Background task via startLocationUpdatesAsync.
  * É o único mecanismo que funciona com a app minimizada no iOS.
@@ -37,12 +41,16 @@ export const defineBackgroundTask = (): void => {
         | undefined;
       if (!locations?.length) return;
 
+      // Fast in-memory guard: if another execution is already in-flight, skip.
+      if (isSending) return;
+
       const now = Date.now();
       try {
         const last = await AsyncStorage.getItem(LAST_PING_KEY);
         if (last && now - parseInt(last, 10) < THROTTLE_MS) return;
       } catch (_) {}
 
+      isSending = true;
       try {
         const uplinkState = await AsyncStorage.getItem(UPLINK_STORAGE_KEY);
         if (uplinkState !== "true") return;
@@ -70,6 +78,8 @@ export const defineBackgroundTask = (): void => {
         } else {
           console.error("❌ BG task erro:", message);
         }
+      } finally {
+        isSending = false;
       }
     },
   );
@@ -91,14 +101,15 @@ export const startBackgroundLocationTracking = async (): Promise<void> => {
     }
     console.log("✅ Permissão de background:", status);
 
-    await AsyncStorage.removeItem(LAST_PING_KEY).catch(() => {});
-
     const isRegistered =
       await TaskManager.isTaskRegisteredAsync(BACKGROUND_TASK_NAME);
     if (isRegistered) {
       console.log("ℹ️ A re-registar background task...");
       await Location.stopLocationUpdatesAsync(BACKGROUND_TASK_NAME);
     }
+
+    // Do NOT clear LAST_PING_KEY here — preserving the throttle timestamp
+    // prevents iOS from delivering all buffered/queued locations on startup.
 
     await Location.startLocationUpdatesAsync(BACKGROUND_TASK_NAME, {
       accuracy: Location.Accuracy.Balanced,

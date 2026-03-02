@@ -129,6 +129,7 @@ def live_stream(request):
         # Confirma ligação imediatamente (keepalive comment)
         yield ": connected\n\n"
 
+        heartbeat_counter = 0
         while True:
             new_reports = list(
                 AirQualityReport.objects.filter(id__gt=last_id)
@@ -148,7 +149,13 @@ def live_stream(request):
                 report["created_at"] = report["created_at"].isoformat()
                 yield f"data: {json.dumps(report, cls=DjangoJSONEncoder)}\n\n"
 
-            time.sleep(2)
+            # Send a keepalive comment every ~15s (every 5 iterations × 3s)
+            # to prevent proxies and browsers from closing idle connections.
+            heartbeat_counter += 1
+            if heartbeat_counter % 5 == 0:
+                yield ": keepalive\n\n"
+
+            time.sleep(3)
 
     response = StreamingHttpResponse(
         streaming_content=event_stream(),

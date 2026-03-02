@@ -45,6 +45,7 @@
     "babel-preset-expo": "^55.0.8",
     "prettier": "^3.8.1",
     "prettier-plugin-tailwindcss": "^0.5.11",
-    "tailwindcss": "^3.4.17"
+    "tailwindcss": "^3.4.17",
+    "typescript": "~5.9.2"
   }
 }

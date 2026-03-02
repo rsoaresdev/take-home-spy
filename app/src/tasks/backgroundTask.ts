@@ -66,18 +66,8 @@ export const defineBackgroundTask = (): void => {
           `✅ BG sync: AQI ${aqiValue} @ ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
         );
       } catch (err) {
-        const message = err instanceof Error ? err.message : "";
-        const isNetworkError =
-          message.includes("Network request failed") ||
-          message.includes("network") ||
-          message.includes("fetch");
-        if (isNetworkError) {
-          await AsyncStorage.setItem(LAST_PING_KEY, String(now)).catch(
-            () => {},
-          );
-        } else {
-          console.error("❌ BG task erro:", message);
-        }
+        const message = err instanceof Error ? err.message : String(err);
+        console.warn("⚠️ BG task erro:", message);
       } finally {
         isSending = false;
       }

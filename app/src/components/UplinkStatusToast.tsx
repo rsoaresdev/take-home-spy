@@ -5,10 +5,9 @@ import Toast from "../components/Toast";
 
 /**
  * UplinkStatusToast - Mostra toast quando uplink está ativo
- * Componente separado para não causar re-renders desnecessários
  */
 export default function UplinkStatusToast() {
-  const { isUplinkActive, isLoading } = useUplinkToggle(() => {});
+  const { isUplinkActive, isLoading } = useUplinkToggle();
   const { toast, showToast, hideToast } = useToast();
 
   useEffect(() => {

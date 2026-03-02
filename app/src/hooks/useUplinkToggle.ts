@@ -4,27 +4,35 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 const UPLINK_STORAGE_KEY = "@puresky_uplink_active";
 const LAST_PING_KEY = "@puresky_last_ping_ts";
 
+interface UseUplinkToggleReturn {
+  isUplinkActive: boolean;
+  showVisualIndicator: boolean;
+  isLoading: boolean;
+  handleTap: () => void;
+  toggleUplink: () => void;
+}
+
 /**
  * Hook para gerir toggle persistente do uplink (5 toques para ligar/desligar)
- * @param {Function} onToggle - Callback chamado quando estado muda com (isActive, wasManualToggle)
- * @returns {Object} Estado e handler do uplink
  */
-export const useUplinkToggle = (onToggle) => {
+export const useUplinkToggle = (
+  onToggle?: (isActive: boolean, wasManual: boolean) => void,
+): UseUplinkToggleReturn => {
   const [tapCount, setTapCount] = useState(0);
   const [isUplinkActive, setIsUplinkActive] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const tapTimeoutRef = useRef(null);
-  const visualIndicatorTimeoutRef = useRef(null);
   const [showVisualIndicator, setShowVisualIndicator] = useState(false);
+  const tapTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const visualIndicatorTimeoutRef = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
 
-  // Carregar estado persistente ao inicializar
   useEffect(() => {
     loadUplinkState();
   }, []);
 
   const loadUplinkState = async () => {
     try {
-      // TODO: Utilizar MMKV que é mais rápido
       const savedState = await AsyncStorage.getItem(UPLINK_STORAGE_KEY);
       if (savedState !== null) {
         const isActive = savedState === "true";
@@ -41,7 +49,7 @@ export const useUplinkToggle = (onToggle) => {
     }
   };
 
-  const saveUplinkState = async (newState) => {
+  const saveUplinkState = async (newState: boolean) => {
     try {
       await AsyncStorage.setItem(UPLINK_STORAGE_KEY, String(newState));
       console.log(
@@ -58,26 +66,22 @@ export const useUplinkToggle = (onToggle) => {
     setIsUplinkActive(newState);
     saveUplinkState(newState);
 
-    // Quando uplink é ligado, limpar timestamp para que o 1º ping vá imediatamente
     if (newState) {
       AsyncStorage.removeItem(LAST_PING_KEY).catch(() => {});
-      console.log("🧹 LAST_PING_KEY limpo - próximo update envia imediatamente");
+      console.log(
+        "🧹 LAST_PING_KEY limpo - próximo update envia imediatamente",
+      );
     }
 
-    // Mostrar indicador visual (texto vermelho)
     setShowVisualIndicator(true);
-    if (visualIndicatorTimeoutRef.current) {
+    if (visualIndicatorTimeoutRef.current)
       clearTimeout(visualIndicatorTimeoutRef.current);
-    }
-    visualIndicatorTimeoutRef.current = setTimeout(() => {
-      setShowVisualIndicator(false);
-    }, 1000);
+    visualIndicatorTimeoutRef.current = setTimeout(
+      () => setShowVisualIndicator(false),
+      1000,
+    );
 
-    // Notificar mudança
-    if (onToggle) {
-      onToggle(newState, true); // true = foi toggle manual
-    }
-
+    onToggle?.(newState, true);
     console.log(newState ? "🟢 Uplink ATIVADO" : "🔴 Uplink DESATIVADO");
   }, [isUplinkActive, onToggle]);
 
@@ -85,17 +89,9 @@ export const useUplinkToggle = (onToggle) => {
     const newTapCount = tapCount + 1;
     setTapCount(newTapCount);
 
-    // Limpar timeout anterior
-    if (tapTimeoutRef.current) {
-      clearTimeout(tapTimeoutRef.current);
-    }
+    if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
+    tapTimeoutRef.current = setTimeout(() => setTapCount(0), 2000);
 
-    // Reset após 2 segundos de inatividade
-    tapTimeoutRef.current = setTimeout(() => {
-      setTapCount(0);
-    }, 2000);
-
-    // Toggle após 5 taps
     if (newTapCount === 5) {
       setTapCount(0);
       toggleUplink();
@@ -107,6 +103,6 @@ export const useUplinkToggle = (onToggle) => {
     showVisualIndicator,
     isLoading,
     handleTap,
-    toggleUplink, // Expor para toggle programático
+    toggleUplink,
   };
 };

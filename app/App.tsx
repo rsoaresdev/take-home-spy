@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { ReactElement, useEffect } from "react";
 import { View } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -9,7 +9,7 @@ import {
 } from "./src/tasks/backgroundTask";
 import "./global.css";
 
-export default function App() {
+export default function App(): ReactElement {
   useEffect(() => {
     console.log("🎯 A iniciar background tracking...");
     startBackgroundLocationTracking();

@@ -1,9 +1,7 @@
 /**
  * Descrição humanizada da qualidade do ar
- * @param {number|null} aqi
- * @returns {string}
  */
-export const getAqiDescription = (aqi) => {
+export const getAqiDescription = (aqi: number | null | undefined): string => {
   if (aqi === null || aqi === undefined) return "A calcular...";
   if (aqi <= 20) return "Ar Puro. Excelente!";
   if (aqi <= 40) return "Qualidade Boa";
@@ -15,14 +13,13 @@ export const getAqiDescription = (aqi) => {
 
 /**
  * Determina as cores do gradiente com base no valor do AQI
- * @param {number|null} aqi - Valor do AQI
- * @returns {string[]} Array de cores para o gradiente
  */
-export const getGradientColors = (aqi) => {
+export const getGradientColors = (
+  aqi: number | null,
+): [string, string, string] => {
   if (aqi === null) {
     return ["#0f172a", "#1e3a5f", "#0f172a"]; // azul escuro neutro
   }
-
   if (aqi < 50) {
     return ["#052e16", "#14532d", "#065f46"]; // verde escuro vibrante
   } else if (aqi < 100) {
@@ -34,9 +31,7 @@ export const getGradientColors = (aqi) => {
 
 /**
  * Formata o valor do AQI
- * @param {number|null} aqi - Valor do AQI
- * @returns {string} Valor formatado
  */
-export const formatAqiValue = (aqi) => {
+export const formatAqiValue = (aqi: number | null): string => {
   return aqi !== null ? Math.round(aqi).toString() : "--";
 };

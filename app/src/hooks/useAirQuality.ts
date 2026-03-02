@@ -1,30 +1,35 @@
 import { useState, useEffect, useCallback } from "react";
 import * as Location from "expo-location";
 import { fetchAirQuality } from "../api/openMeteoService";
+import type { AirQualityState, Coordinates } from "../types";
+
+interface UseAirQualityReturn extends AirQualityState {
+  refreshAirQuality: () => Promise<{
+    latitude: number;
+    longitude: number;
+    aqi: number;
+  }>;
+}
 
 /**
  * Hook para gerir estado e lógica de qualidade do ar
- * @returns {Object} Estado e dados de qualidade do ar
  */
-export const useAirQuality = () => {
-  const [aqi, setAqi] = useState(null);
-  const [location, setLocation] = useState(null);
+export const useAirQuality = (): UseAirQualityReturn => {
+  const [aqi, setAqi] = useState<number | null>(null);
+  const [location, setLocation] = useState<Coordinates | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   const initializeAirQuality = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Solicitar permissões de localização
       const { status } = await Location.requestForegroundPermissionsAsync();
-
       if (status !== "granted") {
         throw new Error("Permissão de localização negada");
       }
 
-      // Obter localização atual
       const currentLocation = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
@@ -32,14 +37,14 @@ export const useAirQuality = () => {
       const { latitude, longitude } = currentLocation.coords;
       setLocation({ latitude, longitude });
 
-      // Fetch AQI
       const aqiValue = await fetchAirQuality(latitude, longitude);
       setAqi(aqiValue);
 
       return { latitude, longitude, aqi: aqiValue };
     } catch (err) {
+      const message = err instanceof Error ? err.message : "Erro desconhecido";
       console.error("Error initializing air quality:", err);
-      setError(err.message);
+      setError(message);
       throw err;
     } finally {
       setLoading(false);
@@ -48,15 +53,10 @@ export const useAirQuality = () => {
 
   useEffect(() => {
     let isMounted = true;
-
     const init = async () => {
-      if (isMounted) {
-        await initializeAirQuality();
-      }
+      if (isMounted) await initializeAirQuality();
     };
-
     init();
-
     return () => {
       isMounted = false;
     };

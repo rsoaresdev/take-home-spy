@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, ReactElement } from "react";
 import {
   View,
   Text,
@@ -26,7 +26,7 @@ import { sendAirQualityReport } from "../api/spyService";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-export default function HomeScreen() {
+export default function HomeScreen(): ReactElement {
   const { aqi, location, refreshAirQuality } = useAirQuality();
   const [refreshing, setRefreshing] = useState(false);
   const { toast, showToast, hideToast } = useToast();
@@ -41,15 +41,13 @@ export default function HomeScreen() {
     }, []),
   );
 
-  // Handler para toggle do uplink
   const handleUplinkToggle = useCallback(
-    (isActive, wasManual) => {
+    (isActive: boolean, wasManual: boolean) => {
       if (wasManual) {
-        if (isActive) {
-          showToast("📡 Uplink Ativado", "success");
-        } else {
-          showToast("🔐 Uplink Desativado", "info");
-        }
+        showToast(
+          isActive ? "📡 Uplink Ativado" : "🔐 Uplink Desativado",
+          isActive ? "success" : "info",
+        );
       }
     },
     [showToast],
@@ -58,33 +56,20 @@ export default function HomeScreen() {
   const { showVisualIndicator, handleTap } =
     useUplinkToggle(handleUplinkToggle);
 
-  // Handler para pull-to-refresh
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-
     try {
       showToast("🔄 A forçar atualização...", "info");
 
-      // Forçar nova leitura de GPS
       const currentLocation = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.High,
       });
-
       const { latitude, longitude } = currentLocation.coords;
-
-      // Obter novo AQI
       const newAqi = await fetchAirQuality(latitude, longitude);
-
-      // Enviar ping manual imediato
       await sendAirQualityReport(latitude, longitude, newAqi);
-
       showToast("✅ Dados atualizados!", "success");
 
-      // Refresh do hook
-      if (refreshAirQuality) {
-        await refreshAirQuality();
-      }
-
+      await refreshAirQuality?.();
       console.log("✅ Pull-to-refresh completo:", {
         latitude,
         longitude,
@@ -100,8 +85,6 @@ export default function HomeScreen() {
 
   return (
     <View className="flex-1">
-
-      {/* Gradiente de fundo baseado no AQI */}
       <LinearGradient
         colors={gradientColors}
         style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
@@ -109,7 +92,6 @@ export default function HomeScreen() {
         end={{ x: 1, y: 1 }}
       />
 
-      {/* ScrollView com RefreshControl */}
       <ScrollView
         contentContainerStyle={{ flexGrow: 1 }}
         refreshControl={
@@ -122,7 +104,6 @@ export default function HomeScreen() {
         }
       >
         <SafeAreaView className="flex-1">
-          {/* Top bar */}
           <Animated.View
             entering={FadeInUp.duration(500)}
             className="px-6 pt-2 flex-row justify-between items-center"
@@ -132,17 +113,13 @@ export default function HomeScreen() {
             </Text>
           </Animated.View>
 
-          {/* Área principal */}
           <View className="flex-1 items-center justify-center px-8">
-            {/* Anel decorativo + AQI */}
             <AnimatedPressable
               entering={ZoomIn.duration(700).springify()}
               onPress={handleTap}
               className="items-center justify-center"
             >
-              {/* Anel exterior */}
               <View className="w-60 h-60 rounded-full border border-white/[0.08] items-center justify-center">
-                {/* Anel interior */}
                 <View className="w-52 h-52 rounded-full border border-white/[0.12] items-center justify-center bg-black/[0.12]">
                   <Text
                     className={`text-[96px] font-black leading-[100px] text-center ${
@@ -159,7 +136,6 @@ export default function HomeScreen() {
               </View>
             </AnimatedPressable>
 
-            {/* Badge de qualidade */}
             <Animated.View
               entering={FadeInUp.delay(200).duration(500)}
               className="mt-7 py-2.5 px-7 rounded-full bg-white/10 border border-white/[0.18]"
@@ -169,7 +145,6 @@ export default function HomeScreen() {
               </Text>
             </Animated.View>
 
-            {/* Barra de escala AQI */}
             <Animated.View
               entering={FadeInUp.delay(350).duration(500)}
               className="w-full mt-8"
@@ -178,7 +153,7 @@ export default function HomeScreen() {
                 <View
                   className="h-full bg-white/40 rounded-full"
                   style={{
-                    width: `${Math.min(100, ((aqi || 0) / 200) * 100)}%`,
+                    width: `${Math.min(100, ((aqi ?? 0) / 200) * 100)}%`,
                   }}
                 />
               </View>
@@ -196,7 +171,6 @@ export default function HomeScreen() {
             </Animated.View>
           </View>
 
-          {/* Rodapé com localização */}
           <Animated.View
             entering={FadeInUp.delay(450).duration(500)}
             className="px-6 pb-20 items-center gap-2.5"
@@ -224,7 +198,6 @@ export default function HomeScreen() {
         </SafeAreaView>
       </ScrollView>
 
-      {/* Toast Customizado */}
       <Toast
         key={toast.key}
         visible={toast.visible}

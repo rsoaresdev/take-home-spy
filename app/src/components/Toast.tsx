@@ -7,8 +7,9 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
+import type { ToastType } from "../types";
 
-const TYPE_STYLES = {
+const TYPE_STYLES: Record<ToastType, { borderColor: string; color: string }> = {
   success: { borderColor: "#10b981", color: "#6ee7b7" },
   error: { borderColor: "#ef4444", color: "#fca5a5" },
   info: { borderColor: "#3b82f6", color: "#93c5fd" },
@@ -17,10 +18,19 @@ const TYPE_STYLES = {
   default: { borderColor: "#475569", color: "#94a3b8" },
 };
 
-/**
- * Toast Component — glassmorphism style
- */
-export default function Toast({ visible, message, type = "success", onHide }) {
+interface ToastProps {
+  visible: boolean;
+  message: string;
+  type?: ToastType;
+  onHide?: () => void;
+}
+
+export default function Toast({
+  visible,
+  message,
+  type = "success",
+  onHide,
+}: ToastProps) {
   const translateY = useSharedValue(-100);
   const opacity = useSharedValue(0);
 
@@ -28,7 +38,6 @@ export default function Toast({ visible, message, type = "success", onHide }) {
     if (visible) {
       translateY.value = withSpring(0, { damping: 18, stiffness: 140 });
       opacity.value = withTiming(1, { duration: 180 });
-
       const timeout = setTimeout(() => hideToast(), 2200);
       return () => clearTimeout(timeout);
     } else {
@@ -50,7 +59,7 @@ export default function Toast({ visible, message, type = "success", onHide }) {
 
   if (!visible) return null;
 
-  const styles = TYPE_STYLES[type] || TYPE_STYLES.default;
+  const styles = TYPE_STYLES[type] ?? TYPE_STYLES.default;
   const isCenter = type === "center" || type === "centerOff";
 
   return (

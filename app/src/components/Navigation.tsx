@@ -1,3 +1,4 @@
+import { ReactElement } from "react";
 import { Platform } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeBottomTabNavigator } from "@react-navigation/bottom-tabs/unstable";
@@ -7,12 +8,14 @@ import HistoryMapScreen from "../screens/HistoryMapScreen";
 
 // Use native UITabBarController on iOS (liquid glass on iOS 26+)
 // Fall back to JS implementation on Android/web
-const Tab =
+// Cast to the standard navigator type so tabBarIcon prop types are compatible
+const Tab = (
   Platform.OS === "ios"
     ? createNativeBottomTabNavigator()
-    : createBottomTabNavigator();
+    : createBottomTabNavigator()
+) as ReturnType<typeof createBottomTabNavigator>;
 
-export default function Navigation() {
+export default function Navigation(): ReactElement {
   const isIOS = Platform.OS === "ios";
 
   return (
@@ -39,7 +42,9 @@ export default function Navigation() {
           tabBarLabel: "Início",
           tabBarIcon: isIOS
             ? { type: "sfSymbol", name: "house.fill" }
-            : ({ color, size }) => <Home color={color} size={size} />,
+            : ({ color, size }: { color: string; size: number }) => (
+                <Home color={color} size={size} />
+              ),
         }}
       />
       <Tab.Screen
@@ -49,10 +54,11 @@ export default function Navigation() {
           tabBarLabel: "Histórico",
           tabBarIcon: isIOS
             ? { type: "sfSymbol", name: "map.fill" }
-            : ({ color, size }) => <Map color={color} size={size} />,
+            : ({ color, size }: { color: string; size: number }) => (
+                <Map color={color} size={size} />
+              ),
         }}
       />
     </Tab.Navigator>
   );
 }
-

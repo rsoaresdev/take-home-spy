@@ -149,8 +149,8 @@ def live_stream(request):
                 report["created_at"] = report["created_at"].isoformat()
                 yield f"data: {json.dumps(report, cls=DjangoJSONEncoder)}\n\n"
 
-            # Send a keepalive comment every ~15s (every 5 iterations × 3s)
-            # to prevent proxies and browsers from closing idle connections.
+            # Enviar um keepalive a cada ~15s (a cada 5 iterações × 3s)
+            # para evitar que proxies e browsers fechem ligações inativas.
             heartbeat_counter += 1
             if heartbeat_counter % 5 == 0:
                 yield ": keepalive\n\n"

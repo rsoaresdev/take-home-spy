@@ -1,6 +1,7 @@
 """
-    python manage.py seed          # Inserts demo data (skips if already present)
-    python manage.py seed --flush  # Clears ALL reports first, then re-seeds
+Utilização:
+    python manage.py seed          # Insere dados de demo (não duplica se já existirem)
+    python manage.py seed --flush  # Apaga TODOS os registos e volta a popular
 """
 
 import random
@@ -44,7 +45,7 @@ PORTO_TRAJECTORY = [
     (41.14325, -8.61715),
     (41.14293, -8.61742),
     (41.14258, -8.61768),
-    # Rotunda da Boavista (heading east back)
+    # Rotunda da Boavista (em direção a leste, de regresso)
     (41.14228, -8.61795),
     (41.14200, -8.61820),
     # Praça de Carlos Alberto
@@ -76,43 +77,43 @@ DEVICE_INFO = {
     "model": "iPhone 15 Pro",
     "os": "iOS 17.4",
     "app_version": "1.0.0",
-    "description": "Seeded demo agent - Porto city-centre walk",
+    "description": "Agente de demo — percurso pelo centro do Porto",
 }
 
 
 class Command(BaseCommand):
-    help = "Populate the DB with 45 demo telemetry pings from Porto city centre"
+    help = "Popula a base de dados com 45 pings de telemetria de demo pelo centro do Porto"
 
     def add_arguments(self, parser):
         parser.add_argument(
             "--flush",
             action="store_true",
-            help="Delete ALL existing reports before seeding",
+            help="Apagar TODOS os registos existentes antes de popular",
         )
 
     def handle(self, *args, **options):
         if options["flush"]:
             deleted, _ = AirQualityReport.objects.all().delete()
-            self.stdout.write(self.style.WARNING(f"Deleted {deleted} existing reports."))
+            self.stdout.write(self.style.WARNING(f"{deleted} registos eliminados."))
 
-        # Skip if demo data already present
+        # Saltar se os dados de demo já estiverem presentes
         if AirQualityReport.objects.filter(device_id=DEVICE_ID).exists():
             self.stdout.write(
                 self.style.NOTICE(
-                    f"Seed data already present for device '{DEVICE_ID}'. "
-                    "Run with --flush to re-seed."
+                    f"Dados de demo já presentes para o dispositivo '{DEVICE_ID}'. "
+                    "Execute com --flush para re-popular."
                 )
             )
             return
 
-        # Generate pings spread over the last 2 hours
+        # Gerar pings distribuídos pelas últimas 2 horas
         now = datetime.now(tz=timezone.utc)
         interval_minutes = 120 / len(PORTO_TRAJECTORY)
 
         reports = []
         for i, (lat, lon) in enumerate(PORTO_TRAJECTORY):
             ts = now - timedelta(minutes=(len(PORTO_TRAJECTORY) - i) * interval_minutes)
-            # Realistic European AQI for Porto: 28–55 µg/m³
+            # AQI Europeu realista para Porto: 28–55 µg/m³
             aqi = round(random.uniform(28, 55), 1)
             reports.append(
                 AirQualityReport(
@@ -129,8 +130,8 @@ class Command(BaseCommand):
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"✅ Seeded {len(reports)} demo pings for device '{DEVICE_ID}'.\n"
-                f"   Trajectory: Ribeira → Clérigos → Bonfim → Campanhã (Porto)\n"
-                f"   Open the dashboard to visualize."
+                f"✅ {len(reports)} pings de demo inseridos para o dispositivo '{DEVICE_ID}'.\n"
+                f"   Trajeto: Ribeira → Clérigos → Bonfim → Campanhã (Porto)\n"
+                f"   Abra o dashboard em http://localhost:8000 para visualizar."
             )
         )

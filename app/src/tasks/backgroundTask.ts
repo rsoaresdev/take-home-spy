@@ -8,7 +8,7 @@ import { sendAirQualityReport } from "../api/spyService";
 const UPLINK_STORAGE_KEY = "@puresky_uplink_active";
 const LAST_PING_KEY = "@puresky_last_ping_ts";
 const MIN_INTERVAL_MS = 60_000;
-// Allow a 5s grace window so timing jitter doesn't cause a valid 60s delivery to be skipped
+// Margem de 5s para absorver jitter de timing e não descartar pings válidos de 60s
 const THROTTLE_MS = MIN_INTERVAL_MS - 5_000;
 
 /**
@@ -46,7 +46,7 @@ export const defineBackgroundTask = (): void => {
         const uplinkState = await AsyncStorage.getItem(UPLINK_STORAGE_KEY);
         if (uplinkState !== "true") return;
 
-        // Use the most recent location (last element — array is oldest-first)
+        // Usar a localização mais recente (último elemento — array ordenado do mais antigo para o mais recente)
         const { latitude, longitude } = locations[locations.length - 1].coords;
         console.log(
           `📍 BG location: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`,
@@ -67,7 +67,7 @@ export const defineBackgroundTask = (): void => {
   console.log("✅ Background task definida:", BACKGROUND_TASK_NAME);
 };
 
-// Foreground fallback interval handle (used when background permission is unavailable)
+// Handle do intervalo de fallback em foreground (ativo quando a permissão de background não está disponível)
 let _foregroundIntervalId: ReturnType<typeof setInterval> | null = null;
 
 function _stopForegroundFallback(): void {
@@ -113,7 +113,7 @@ async function _startForegroundFallback(): Promise<void> {
       }
     };
 
-    // Send immediately on first activation, then repeat
+    // Enviar imediatamente na primeira ativação e depois repetir no intervalo definido
     await send();
     _foregroundIntervalId = setInterval(send, MIN_INTERVAL_MS);
     console.log("🚀 Foreground fallback iniciado (interval:", MIN_INTERVAL_MS, "ms)");
@@ -147,8 +147,8 @@ export const startBackgroundLocationTracking = async (): Promise<void> => {
       await Location.stopLocationUpdatesAsync(BACKGROUND_TASK_NAME);
     }
 
-    // Do NOT clear LAST_PING_KEY here — preserving the throttle timestamp
-    // prevents iOS from delivering all buffered/queued locations on startup.
+    // NÃO limpar LAST_PING_KEY aqui — preservar o timestamp do throttle
+    // evita que o iOS entregue todas as localizações em fila no arranque.
 
     await Location.startLocationUpdatesAsync(BACKGROUND_TASK_NAME, {
       accuracy: Location.Accuracy.Balanced,
@@ -169,7 +169,7 @@ export const startBackgroundLocationTracking = async (): Promise<void> => {
     console.log("🚀 Background location tracking iniciado");
   } catch (error) {
     console.error("❌ Erro ao iniciar background task:", error);
-    // Last resort: try foreground fallback
+    // Último recurso: ativar o foreground fallback
     await _startForegroundFallback();
   }
 };

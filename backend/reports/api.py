@@ -33,6 +33,29 @@ api = NinjaAPI(
 )
 
 
+@api.get("/health", tags=["Sistema"], auth=None)
+def health_check(request):
+    """
+    Verifica o estado do serviço e conectividade à base de dados.
+    Útil para healthchecks de Docker, load balancers e monitorização.
+    """
+    from django.db import connection
+    try:
+        connection.ensure_connection()
+        db_ok = True
+    except Exception:
+        db_ok = False
+
+    total_reports = AirQualityReport.objects.count() if db_ok else None
+
+    return {
+        "status": "ok" if db_ok else "degraded",
+        "database": "connected" if db_ok else "unreachable",
+        "total_reports": total_reports,
+        "version": "1.0.0",
+    }
+
+
 # Schemas para validação de dados
 class PingRequest(Schema):
     device_id: str

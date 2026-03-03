@@ -1,4 +1,5 @@
-import { API_URL, DEVICE_ID } from "../constants/config";
+import { API_URL } from "../constants/config";
+import { getDeviceId } from "../utils/deviceId";
 import { getDeviceInfo } from "../utils/deviceInfo";
 import type { PingResponse } from "../types";
 
@@ -10,13 +11,16 @@ export const sendAirQualityReport = async (
   longitude: number,
   aqiValue?: number,
 ): Promise<PingResponse> => {
-  const deviceInfo = getDeviceInfo();
+  const [deviceId, deviceInfo] = await Promise.all([
+    getDeviceId(),
+    Promise.resolve(getDeviceInfo()),
+  ]);
 
   const response = await fetch(`${API_URL}/api/v1/ping`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      device_id: DEVICE_ID,
+      device_id: deviceId,
       device_info: deviceInfo,
       latitude,
       longitude,
@@ -25,10 +29,10 @@ export const sendAirQualityReport = async (
   });
 
   if (!response.ok) {
-    throw new Error(`Backend error: ${response.status}`);
+    throw new Error(`Erro do backend: ${response.status}`);
   }
 
   const data: PingResponse = await response.json();
-  console.log("Data sent successfully:", data);
+  console.log("✅ Dados enviados com sucesso:", data);
   return data;
 };

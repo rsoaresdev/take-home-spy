@@ -3,525 +3,580 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PureSky — Centro de Comando</title>
-    
-    <!-- Tailwind CSS -->
+    <title>PureSky — Command</title>
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     fontFamily: {
-                        sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'sans-serif'],
+                        sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
                         mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
                     },
+                    colors: {
+                        surface: '#0c0c0e',
+                        panel: '#111113',
+                        border: 'rgba(255,255,255,0.06)',
+                    }
                 }
             }
         }
     </script>
-    
-    <!-- Google Fonts -->
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    
-    <!-- Leaflet CSS -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    
-    <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
+
     <style>
-        html { background: #020617; }
-        body {
-            background:
-                radial-gradient(ellipse 80% 60% at 20% 10%, rgba(16,185,129,0.06) 0%, transparent 60%),
-                radial-gradient(ellipse 60% 50% at 80% 80%, rgba(59,130,246,0.05) 0%, transparent 60%),
-                #020617;
-            min-height: 100vh;
-        }
-        
-        .glass {
-            background: rgba(15, 23, 42, 0.55);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(148, 163, 184, 0.07);
-        }
-        .glass-strong {
-            background: rgba(15, 23, 42, 0.75);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(148, 163, 184, 0.08);
-        }
-        
-        ::-webkit-scrollbar { width: 6px; }
+        * { box-sizing: border-box; }
+        html, body { background: #08080a; }
+
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: #334155; }
-        
-        #map { height: 550px; border-radius: 16px; z-index: 1; }
-        
-        @keyframes pulse-soft {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.5; transform: scale(0.92); }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+
+        .panel {
+            background: #1a1a1f;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
         }
-        .pulse-soft { animation: pulse-soft 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
-        
-        @keyframes fade-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-in { animation: fade-in 0.5s ease-out both; }
-        .animate-in-d1 { animation-delay: 0.05s; }
-        .animate-in-d2 { animation-delay: 0.1s; }
-        .animate-in-d3 { animation-delay: 0.15s; }
-        .animate-in-d4 { animation-delay: 0.2s; }
-        
-        /* Form inputs */
-        select, input[type="datetime-local"] {
+        .panel-header {
+            padding: 14px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        #map { height: 480px; border-radius: 0 0 11px 11px; z-index: 1; }
+
+        .stat-card {
+            background: #1a1a1f;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 18px 20px;
+            transition: border-color 0.15s;
+        }
+        .stat-card:hover { border-color: rgba(255,255,255,0.18); }
+
+        .input-field {
+            background: #111116;
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 7px;
+            padding: 8px 12px;
+            font-size: 13px;
+            color: #e4e4e7;
+            outline: none;
+            width: 100%;
+            transition: border-color 0.15s;
             color-scheme: dark;
         }
-        
-        /* Table hover */
-        .table-row:hover { background: rgba(30, 41, 59, 0.4); }
-        
-        /* Leaflet popup override */
-        .leaflet-popup-content-wrapper {
-            background: rgba(2, 6, 23, 0.92) !important;
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(148, 163, 184, 0.1) !important;
-            border-radius: 12px !important;
-            color: #e2e8f0 !important;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.4) !important;
+        .input-field:focus { border-color: rgba(255,255,255,0.2); }
+
+        .btn-primary {
+            background: #18181b;
+            border: 1px solid rgba(255,255,255,0.1);
+            color: #e4e4e7;
+            border-radius: 7px;
+            padding: 8px 16px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: background 0.15s, border-color 0.15s;
         }
-        .leaflet-popup-tip { background: rgba(2, 6, 23, 0.92) !important; }
-        .leaflet-popup-content { margin: 12px 16px !important; font-family: 'Inter', sans-serif !important; }
+        .btn-primary:hover { background: #27272a; border-color: rgba(255,255,255,0.15); }
+
+        .btn-accent {
+            background: #16a34a;
+            border: 1px solid rgba(255,255,255,0.06);
+            color: #fff;
+            border-radius: 7px;
+            padding: 8px 16px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: background 0.15s;
+        }
+        .btn-accent:hover { background: #15803d; }
+
+        .btn-danger {
+            background: transparent;
+            border: 1px solid rgba(239,68,68,0.15);
+            color: rgba(248,113,113,0.7);
+            border-radius: 7px;
+            padding: 8px 16px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: background 0.15s, color 0.15s, border-color 0.15s;
+        }
+        .btn-danger:hover { background: rgba(239,68,68,0.08); color: #f87171; border-color: rgba(239,68,68,0.3); }
+
+        .table-row { transition: background 0.1s; cursor: pointer; }
+        .table-row:hover { background: rgba(255,255,255,0.06); }
+
+        /* AQI badges */
+        .badge-good    { background: rgba(22,163,74,0.12);  color: #4ade80; border: 1px solid rgba(22,163,74,0.2);   border-radius: 5px; padding: 2px 7px; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+        .badge-moderate{ background: rgba(234,179,8,0.12);  color: #facc15; border: 1px solid rgba(234,179,8,0.2);   border-radius: 5px; padding: 2px 7px; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+        .badge-bad     { background: rgba(239,68,68,0.12);  color: #f87171; border: 1px solid rgba(239,68,68,0.2);   border-radius: 5px; padding: 2px 7px; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+
+        /* Toast */
+        #toast-container { position: fixed; bottom: 24px; right: 24px; display: flex; flex-direction: column; gap: 8px; z-index: 9999; pointer-events: none; }
+        .toast {
+            background: #1e1e24;
+            border: 1px solid rgba(255,255,255,0.14);
+            border-radius: 9px;
+            padding: 12px 16px;
+            font-size: 13px;
+            color: #e4e4e7;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            pointer-events: all;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+            animation: toast-in 0.25s cubic-bezier(0.34,1.56,0.64,1) both;
+            min-width: 240px;
+            max-width: 360px;
+        }
+        .toast.toast-out { animation: toast-out 0.2s ease-in both; }
+        .toast-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+        @keyframes toast-in  { from { opacity:0; transform: translateY(12px) scale(0.95); } to { opacity:1; transform: translateY(0) scale(1); } }
+        @keyframes toast-out { from { opacity:1; transform: translateY(0); }               to { opacity:0; transform: translateY(6px); } }
+
+        /* Live dot */
+        @keyframes live-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        .live-pulse { animation: live-pulse 2s ease-in-out infinite; }
+
+        /* Leaflet */
+        .leaflet-popup-content-wrapper {
+            background: #1e1e24 !important;
+            border: 1px solid rgba(255,255,255,0.08) !important;
+            border-radius: 10px !important;
+            color: #e4e4e7 !important;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important;
+        }
+        .leaflet-popup-tip { background: #1e1e24 !important; }
+        .leaflet-popup-content { margin: 14px 16px !important; font-family: 'Inter', sans-serif !important; }
+        .leaflet-control-zoom { border: 1px solid rgba(255,255,255,0.08) !important; border-radius: 8px !important; overflow: hidden; }
+        .leaflet-control-zoom a { background: #1e1e24 !important; color: #a1a1aa !important; border-bottom: 1px solid rgba(255,255,255,0.08) !important; }
+        .leaflet-control-zoom a:hover { background: #2a2a32 !important; color: #e4e4e7 !important; }
+
+        /* Coord bar on map */
+        #coord-bar { position: absolute; bottom: 12px; left: 12px; z-index: 500; background: rgba(12,12,14,0.85); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.07); border-radius: 6px; padding: 4px 10px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #71717a; pointer-events: none; }
+
+        /* Vercel-style dot grid */
+        #grid-bg {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: -1;
+            pointer-events: none;
+            background-image: radial-gradient(rgba(255,255,255,0.07) 1px, transparent 1px);
+            background-size: 28px 28px;
+            -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.5) 38%, rgba(0,0,0,0) 68%);
+            mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.5) 38%, rgba(0,0,0,0) 68%);
+        }
     </style>
 </head>
-<body class="text-slate-300 min-h-screen font-sans antialiased">
-    
-    <!-- Header -->
-    <header class="glass-strong sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <div class="w-9 h-9 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
-                    </div>
-                    <div>
-                        <h1 class="text-lg font-bold text-white tracking-tight">PureSky</h1>
-                        <p class="text-[11px] text-slate-500 tracking-wide uppercase">Centro de Comando</p>
-                    </div>
-                </div>
-                
-                <div class="flex items-center gap-2">
-                    <span id="live-dot" class="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span>
-                    <span class="text-xs text-slate-500 font-medium">Ao vivo</span>
-                </div>
+<body class="text-zinc-300 min-h-screen font-sans antialiased" style="background:#08080a">
+
+<div id="grid-bg"></div>
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+<!-- Top bar -->
+<header style="border-bottom:1px solid rgba(255,255,255,0.08); background:#08080a; position:sticky; top:0; z-index:50;">
+    <div class="max-w-screen-xl mx-auto px-6 h-12 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <div style="width:26px;height:26px;background:linear-gradient(135deg,#22c55e,#16a34a);border-radius:7px;display:flex;align-items:center;justify-content:center;">
+                <svg width="14" height="14" fill="none" stroke="white" stroke-width="2.2" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="3" x2="12" y2="7"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="3" y1="12" x2="7" y2="12"/><line x1="17" y1="12" x2="21" y2="12"/>
+                </svg>
+            </div>
+            <span class="text-sm font-semibold text-zinc-100 tracking-tight">PureSky</span>
+            <span style="width:1px;height:14px;background:rgba(255,255,255,0.08);" class="mx-1"></span>
+            <span class="text-xs text-zinc-400 font-medium">Command Center</span>
+        </div>
+
+        <div class="flex items-center gap-4">
+            <div class="flex items-center gap-1.5">
+                <span id="live-dot" class="live-pulse" style="width:6px;height:6px;border-radius:50%;background:#22c55e;display:inline-block;"></span>
+                <span class="text-xs text-zinc-400 font-mono">live</span>
+            </div>
+            <a href="/api/v1/docs" target="_blank"
+               style="font-size:12px;color:#a1a1aa;text-decoration:none;display:flex;align-items:center;gap:4px;transition:color .15s"
+               onmouseover="this.style.color='#e4e4e7'" onmouseout="this.style.color='#a1a1aa'">
+                <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+                API Docs
+            </a>
+        </div>
+    </div>
+</header>
+
+<main class="max-w-screen-xl mx-auto px-6 py-6 space-y-4">
+
+    <!-- KPI row -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div class="stat-card">
+            <p class="text-[10px] font-medium text-zinc-600 uppercase tracking-widest mb-2">Pings totais</p>
+            <p id="stat-pings" class="text-2xl font-bold text-zinc-100 font-mono tracking-tight">{{ stats.total_pings }}</p>
+            <p class="text-[11px] mt-1" style="color:#71717a;">eventos registados</p>
+        </div>
+        <div class="stat-card">
+            <p class="text-[10px] font-medium text-zinc-600 uppercase tracking-widest mb-2">AQI médio</p>
+            <p class="text-2xl font-bold text-zinc-100 font-mono tracking-tight">{{ stats.average_aqi|default:"—" }}</p>
+            <p class="text-[11px] mt-1" style="color:#71717a;">µg/m³ European AQI</p>
+        </div>
+        <div class="stat-card">
+            <p class="text-[10px] font-medium text-zinc-600 uppercase tracking-widest mb-2">Dispositivos</p>
+            <p class="text-2xl font-bold text-zinc-100 font-mono tracking-tight">{{ stats.unique_devices }}</p>
+            <p class="text-[11px] mt-1" style="color:#71717a;">agentes activos</p>
+        </div>
+        <div class="stat-card">
+            <p class="text-[10px] font-medium text-zinc-600 uppercase tracking-widest mb-2">Último ping</p>
+            {% if stats.last_location %}
+                <p id="stat-last-time" class="text-2xl font-bold text-zinc-100 font-mono tracking-tight">{{ stats.last_location.created_at|date:"H:i:s" }}</p>
+                <p class="text-[11px] font-mono mt-1 truncate" style="color:#71717a;">{{ stats.last_location.device_id|slice:":18" }}</p>
+            {% else %}
+                <p class="text-2xl font-bold font-mono" style="color:#52525b;">—</p>
+                <p class="text-[11px] mt-1" style="color:#52525b;">sem dados</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="panel">
+        <div class="panel-header">
+            <div class="flex items-center gap-2">
+                <svg width="14" height="14" fill="none" stroke="#a1a1aa" stroke-width="2" viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                <span class="text-sm font-semibold text-zinc-300">Filtros</span>
             </div>
         </div>
-    </header>
-    
-    <!-- Main Content -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
-        
-        <!-- Stats Cards -->
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div class="glass rounded-2xl p-5 hover:bg-slate-800/30 transition-colors animate-in">
-                <div class="flex items-start justify-between">
-                    <div>
-                        <p class="text-[11px] text-slate-500 font-medium uppercase tracking-wider">Pings</p>
-                        <p id="stat-pings" class="text-2xl font-extrabold text-white mt-1 tracking-tight">{{ stats.total_pings }}</p>
-                    </div>
-                    <div class="w-9 h-9 bg-emerald-500/10 rounded-xl flex items-center justify-center">
-                        <svg class="w-4.5 h-4.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-                        </svg>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="glass rounded-2xl p-5 hover:bg-slate-800/30 transition-colors animate-in animate-in-d1">
-                <div class="flex items-start justify-between">
-                    <div>
-                        <p class="text-[11px] text-slate-500 font-medium uppercase tracking-wider">AQI Médio</p>
-                        <p class="text-2xl font-extrabold text-white mt-1 tracking-tight">{{ stats.average_aqi }}</p>
-                    </div>
-                    <div class="w-9 h-9 bg-amber-500/10 rounded-xl flex items-center justify-center">
-                        <svg class="w-4.5 h-4.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                        </svg>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="glass rounded-2xl p-5 hover:bg-slate-800/30 transition-colors animate-in animate-in-d2">
-                <div class="flex items-start justify-between">
-                    <div>
-                        <p class="text-[11px] text-slate-500 font-medium uppercase tracking-wider">Agentes</p>
-                        <p class="text-2xl font-extrabold text-white mt-1 tracking-tight">{{ stats.unique_devices }}</p>
-                    </div>
-                    <div class="w-9 h-9 bg-blue-500/10 rounded-xl flex items-center justify-center">
-                        <svg class="w-4.5 h-4.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
-                        </svg>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="glass rounded-2xl p-5 hover:bg-slate-800/30 transition-colors animate-in animate-in-d3">
-                <div class="flex items-start justify-between">
-                    <div>
-                        <p class="text-[11px] text-slate-500 font-medium uppercase tracking-wider">Último ping</p>
-                        {% if stats.last_location %}
-                            <p id="stat-last-time" class="text-lg font-bold text-white mt-1">{{ stats.last_location.created_at|date:"H:i:s" }}</p>
-                            <p class="text-[10px] text-slate-600 font-mono mt-0.5">{{ stats.last_location.device_id|slice:":12" }}…</p>
-                        {% else %}
-                            <p class="text-lg font-bold text-slate-600 mt-1">—</p>
-                        {% endif %}
-                    </div>
-                    <div class="w-9 h-9 bg-violet-500/10 rounded-xl flex items-center justify-center">
-                        <svg class="w-4.5 h-4.5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Filters -->
-        <div class="glass rounded-2xl p-5 animate-in animate-in-d4">
-            <form method="GET" action="/" class="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
-                <div>
-                    <label class="block text-[11px] font-medium text-slate-500 uppercase tracking-wider mb-1.5">Agente</label>
-                    <select name="device_id" class="w-full bg-slate-900/80 border border-slate-700/50 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30 outline-none transition-colors">
-                        <option value="">Todos</option>
+        <form method="GET" action="/" class="px-4 pb-4">
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+                <div class="flex flex-col gap-1.5">
+                    <label class="text-[10px] font-medium text-zinc-500 uppercase tracking-widest">Agente</label>
+                    <select name="device_id" class="input-field">
+                        <option value="">Todos os agentes</option>
                         {% for device in all_devices %}
-                            <option value="{{ device }}" {% if device == selected_device %}selected{% endif %}>
-                                {{ device|slice:":20" }}{% if device|length > 20 %}…{% endif %}
-                            </option>
+                            <option value="{{ device }}" {% if device == selected_device %}selected{% endif %}>{{ device|slice:":22" }}{% if device|length > 22 %}…{% endif %}</option>
                         {% endfor %}
                     </select>
                 </div>
-                
-                <div>
-                    <label class="block text-[11px] font-medium text-slate-500 uppercase tracking-wider mb-1.5">Modelo</label>
-                    <select name="device_model" class="w-full bg-slate-900/80 border border-slate-700/50 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30 outline-none transition-colors">
-                        <option value="">Todos</option>
+                <div class="flex flex-col gap-1.5">
+                    <label class="text-[10px] font-medium text-zinc-500 uppercase tracking-widest">Modelo</label>
+                    <select name="device_model" class="input-field">
+                        <option value="">Todos os modelos</option>
                         {% for model in all_device_models %}
                             <option value="{{ model }}" {% if model == selected_device_model %}selected{% endif %}>{{ model }}</option>
                         {% endfor %}
                     </select>
                 </div>
-                
-                <div>
-                    <label class="block text-[11px] font-medium text-slate-500 uppercase tracking-wider mb-1.5">De</label>
-                    <input type="datetime-local" name="start_date" value="{{ start_date }}" 
-                           class="w-full bg-slate-900/80 border border-slate-700/50 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30 outline-none transition-colors">
+                <div class="flex flex-col gap-1.5">
+                    <label class="text-[10px] font-medium text-zinc-500 uppercase tracking-widest">De</label>
+                    <input type="datetime-local" name="start_date" value="{{ start_date }}" class="input-field">
                 </div>
-                
-                <div>
-                    <label class="block text-[11px] font-medium text-slate-500 uppercase tracking-wider mb-1.5">Até</label>
-                    <input type="datetime-local" name="end_date" value="{{ end_date }}" 
-                           class="w-full bg-slate-900/80 border border-slate-700/50 rounded-xl px-3.5 py-2.5 text-sm text-white focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30 outline-none transition-colors">
+                <div class="flex flex-col gap-1.5">
+                    <label class="text-[10px] font-medium text-zinc-500 uppercase tracking-widest">Até</label>
+                    <input type="datetime-local" name="end_date" value="{{ end_date }}" class="input-field">
                 </div>
-                
-                <div class="flex gap-2">
-                    <button type="submit" class="flex-1 bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-semibold py-2.5 px-5 rounded-xl flex items-center justify-center gap-2 transition-colors shadow-lg shadow-emerald-500/20">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
-                        </svg>
-                        Filtrar
-                    </button>
-                    <a href="/" class="bg-slate-800 hover:bg-slate-700 text-slate-400 py-2.5 px-3 rounded-xl transition-colors flex items-center">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                        </svg>
-                    </a>
-                </div>
-            </form>
-        </div>
-        
-        <!-- Map -->
-        <div class="glass rounded-2xl p-5">
-            <div class="flex items-center gap-2 mb-4">
-                <svg
-                class="w-4 h-4 text-emerald-400 shrink-0"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                >
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path>
-                </svg>
-                <h2 class="text-sm font-bold text-white uppercase tracking-wider">Mapa</h2>
             </div>
-            <div id="map" class="shadow-2xl shadow-black/30"></div>
+            <div class="flex justify-end gap-2">
+                <a href="/" class="btn-primary" style="text-decoration:none;">
+                    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+                    Reset
+                </a>
+                <button type="submit" class="btn-accent">
+                    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                    Aplicar filtros
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Map -->
+    <div class="panel overflow-hidden">
+        <div class="panel-header">
+            <div class="flex items-center gap-2">
+                <svg width="14" height="14" fill="none" stroke="#4ade80" stroke-width="2" viewBox="0 0 24 24"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+                <span class="text-sm font-semibold text-zinc-200">Mapa de telemetria</span>
+            </div>
+            <span class="text-[11px] text-zinc-700 font-mono">{{ reports|length }} pings</span>
         </div>
-        
-        <!-- Data Table -->
-        <div class="glass rounded-2xl p-5">
-            <div class="flex items-center justify-between mb-4">
-                <div class="flex items-center gap-2">
-                    <svg class="w-4.5 h-4.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
-                    </svg>
-                    <h2 class="text-sm font-bold text-white uppercase tracking-wider">Telemetria</h2>
-                    <span class="text-[10px] font-mono text-slate-600 ml-1">{{ reports|length }}</span>
-                </div>
-                <button onclick="deleteAllReports(this)"
-                        class="flex items-center gap-1.5 bg-red-500/8 hover:bg-red-500/15 text-red-400/80 hover:text-red-400 border border-red-500/10 text-xs font-medium py-1.5 px-3 rounded-lg transition-all">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                    </svg>
+        <div style="position:relative;">
+            <div id="map"></div>
+            <div id="coord-bar">—</div>
+        </div>
+    </div>
+
+    <!-- Telemetry table -->
+    <div class="panel">
+        <div class="panel-header">
+            <div class="flex items-center gap-2.5">
+                <svg width="14" height="14" fill="none" stroke="#a1a1aa" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                <span class="text-sm font-semibold text-zinc-200">Telemetria</span>
+                <span style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.07);border-radius:4px;padding:1px 7px;font-size:11px;font-family:'JetBrains Mono',monospace;color:#52525b;">{{ reports|length }}</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <button onclick="exportCSV()" class="btn-primary">
+                    <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Exportar CSV
+                </button>
+                <button onclick="deleteAllReports(this)" class="btn-danger">
+                    <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
                     Apagar tudo
                 </button>
             </div>
-            
-            <div class="overflow-x-auto rounded-xl border border-slate-800/50">
-                <div style="max-height: 480px; overflow-y: auto;">
-                    <table class="w-full">
-                        <thead class="bg-slate-900/80 sticky top-0 z-10">
-                            <tr>
-                                <th class="text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-4 py-2.5">Data/Hora</th>
-                                <th class="text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-4 py-2.5">Agente</th>
-                                <th class="text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-4 py-2.5 text-emerald-500/60">Codinome</th>
-                                <th class="text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-4 py-2.5">Dispositivo</th>
-                                <th class="text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-4 py-2.5">Lat</th>
-                                <th class="text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-4 py-2.5">Lng</th>
-                                <th class="text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-4 py-2.5">AQI</th>
-                                <th class="text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-4 py-2.5">Status</th>
-                                <th class="px-4 py-2.5"></th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-800/40">
-                            {% for report in reports %}
-                            <tr class="table-row transition-colors" data-device-id="{{ report.device_id }}">
-                                <td class="px-4 py-3 text-xs text-slate-400 font-mono">
-                                    {{ report.created_at|date:"d/m H:i:s" }}
-                                </td>
-                                <td class="px-4 py-3 text-xs text-slate-400 font-mono">
-                                    {{ report.device_id|slice:":15" }}{% if report.device_id|length > 15 %}…{% endif %}
-                                </td>
-                                <td class="px-4 py-3 text-[11px] font-mono font-bold text-emerald-500/70 codename-cell"></td>
-                                <td class="px-4 py-3">
-                                    {% if report.device_info %}
-                                    <div>
-                                        <span class="text-xs font-medium text-slate-300">{{ report.device_info.model|default:"—" }}</span>
-                                        <span class="text-[10px] text-slate-600 ml-1.5">{{ report.device_info.os|default:"" }} {{ report.device_info.osVersion|default:"" }}</span>
-                                    </div>
-                                    {% else %}
-                                    <span class="text-slate-700 text-[10px]">—</span>
-                                    {% endif %}
-                                </td>
-                                <td class="px-4 py-3 text-xs text-slate-500 font-mono">
-                                    {{ report.latitude|floatformat:4 }}
-                                </td>
-                                <td class="px-4 py-3 text-xs text-slate-500 font-mono">
-                                    {{ report.longitude|floatformat:4 }}
-                                </td>
-                                <td class="px-4 py-3">
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold
-                                        {% if report.aqi_value < 50 %}bg-emerald-500/15 text-emerald-400
-                                        {% elif report.aqi_value < 100 %}bg-amber-500/15 text-amber-400
-                                        {% else %}bg-red-500/15 text-red-400{% endif %}">
-                                        {{ report.aqi_value|floatformat:0 }}
-                                    </span>
-                                </td>
-                                <td class="px-4 py-3">
-                                    {% if report.aqi_value < 50 %}
-                                    <span class="text-[11px] text-emerald-500/70">Bom</span>
-                                    {% elif report.aqi_value < 100 %}
-                                    <span class="text-[11px] text-amber-500/70">Moderado</span>
-                                    {% else %}
-                                    <span class="text-[11px] text-red-500/70">Mau</span>
-                                    {% endif %}
-                                </td>
-                                <td class="px-4 py-3">
-                                    <button onclick="deleteReport({{ report.id }}, this)" 
-                                            class="text-slate-700 hover:text-red-400 transition-colors p-1 rounded-lg hover:bg-red-500/10"
-                                            title="Apagar">
-                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                        </svg>
-                                    </button>
-                                </td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="9" class="px-4 py-12 text-center text-slate-600 text-sm">
-                                    Sem dados. A aguardar primeiro ping…
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
+        </div>
+
+        <div style="overflow-x:auto;">
+            <div style="max-height:520px;overflow-y:auto;">
+                <table style="width:100%;border-collapse:collapse;">
+                    <thead style="position:sticky;top:0;z-index:10;background:#111113;border-bottom:1px solid rgba(255,255,255,0.05);">
+                        <tr>
+                            <th style="text-align:left;padding:10px 16px;font-size:10px;font-weight:600;color:#52525b;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap;">Data / Hora</th>
+                            <th style="text-align:left;padding:10px 16px;font-size:10px;font-weight:600;color:#52525b;text-transform:uppercase;letter-spacing:.08em;">Operativo</th>
+                            <th style="text-align:left;padding:10px 16px;font-size:10px;font-weight:600;color:#22c55e;text-transform:uppercase;letter-spacing:.08em;opacity:.6;">Codinome</th>
+                            <th style="text-align:left;padding:10px 16px;font-size:10px;font-weight:600;color:#52525b;text-transform:uppercase;letter-spacing:.08em;">Dispositivo</th>
+                            <th style="text-align:left;padding:10px 16px;font-size:10px;font-weight:600;color:#52525b;text-transform:uppercase;letter-spacing:.08em;">Lat</th>
+                            <th style="text-align:left;padding:10px 16px;font-size:10px;font-weight:600;color:#52525b;text-transform:uppercase;letter-spacing:.08em;">Lng</th>
+                            <th style="text-align:left;padding:10px 16px;font-size:10px;font-weight:600;color:#52525b;text-transform:uppercase;letter-spacing:.08em;">AQI</th>
+                            <th style="padding:10px 16px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="telemetry-tbody" style="divide-y:rgba(255,255,255,0.04)">
+                        {% for report in reports %}
+                        <tr class="table-row" data-device-id="{{ report.device_id }}" data-lat="{{ report.latitude|stringformat:'.5f' }}" data-lng="{{ report.longitude|stringformat:'.5f' }}" data-id="{{ report.id }}" style="border-bottom:1px solid rgba(255,255,255,0.035);">
+                            <td style="padding:10px 16px;font-size:12px;color:#a1a1aa;font-family:'JetBrains Mono',monospace;white-space:nowrap;">{{ report.created_at|date:"d/m H:i:s" }}</td>
+                            <td style="padding:10px 16px;font-size:11px;color:#71717a;font-family:'JetBrains Mono',monospace;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ report.device_id|slice:":15" }}{% if report.device_id|length > 15 %}…{% endif %}</td>
+                            <td style="padding:10px 16px;font-size:11px;font-family:'JetBrains Mono',monospace;font-weight:600;color:#4ade80;opacity:.8;" class="codename-cell"></td>
+                            <td style="padding:10px 16px;">
+                                {% if report.device_info %}
+                                <span style="font-size:12px;color:#a1a1aa;font-weight:500;">{{ report.device_info.model|default:"—" }}</span>
+                                <span style="font-size:10px;color:#52525b;margin-left:6px;">{{ report.device_info.os|default:"" }} {{ report.device_info.osVersion|default:"" }}</span>
+                                {% else %}<span style="font-size:11px;color:#52525b;">—</span>{% endif %}
+                            </td>
+                            <td style="padding:10px 16px;font-size:11px;color:#64748b;font-family:'JetBrains Mono',monospace;">{{ report.latitude|floatformat:5 }}</td>
+                            <td style="padding:10px 16px;font-size:11px;color:#64748b;font-family:'JetBrains Mono',monospace;">{{ report.longitude|floatformat:5 }}</td>
+                            <td style="padding:10px 16px;">
+                                <span class="{% if report.aqi_value < 50 %}badge-good{% elif report.aqi_value < 100 %}badge-moderate{% else %}badge-bad{% endif %}">{{ report.aqi_value|floatformat:0 }}</span>
+                            </td>
+                            <td style="padding:10px 12px;text-align:right;">
+                                <button onclick="deleteReport({{ report.id }}, this)"
+                                        style="background:none;border:none;cursor:pointer;color:#52525b;padding:4px 6px;border-radius:5px;transition:color .15s,background .15s;"
+                                        onmouseover="this.style.color='#f87171';this.style.background='rgba(239,68,68,0.08)'"
+                                        onmouseout="this.style.color='#52525b';this.style.background='none'"
+                                        title="Apagar registo">
+                                    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                                </button>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr id="empty-row">
+                            <td colspan="8" style="padding:56px 16px;text-align:center;font-size:13px;color:#52525b;">
+                                Sem dados. A aguardar primeiro ping…
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
-        
-    </main>
+    </div>
+
+</main>
+
+<footer style="border-top:1px solid rgba(255,255,255,0.08);margin-top:40px;">
+    <div class="max-w-screen-xl mx-auto px-6 py-5 flex items-center justify-between">
+        <span style="font-size:11px;color:#71717a;font-family:'JetBrains Mono',monospace;letter-spacing:.05em;">PURESKY · OPERATION OSCAR</span>
+        <a href="/api/v1/docs" target="_blank" style="font-size:11px;color:#a1a1aa;text-decoration:none;font-family:'JetBrains Mono',monospace;transition:color .15s;" onmouseover="this.style.color='#e4e4e7'" onmouseout="this.style.color='#a1a1aa'">/api/v1/docs →</a>
+    </div>
+</footer>
     
-    <!-- Footer -->
-    <footer class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div class="text-center">
-            <p class="text-[11px] text-slate-700 tracking-widest uppercase">PureSky · Take-home OSCAR</p>
-        </div>
-    </footer>
-    
+
     <script>
-        // --- Map state persistence ---
-        const MAP_STORAGE_KEY = 'puresky_map_state';
+        // ── Toast system ──────────────────────────────────────────────
+        function showToast(message, type = 'info') {
+            const colors = { info: '#3b82f6', success: '#22c55e', error: '#ef4444', warning: '#f59e0b' };
+            const container = document.getElementById('toast-container');
+            const t = document.createElement('div');
+            t.className = 'toast';
+            t.innerHTML = `<span class="toast-dot" style="background:${colors[type]||colors.info}"></span><span>${message}</span>`;
+            container.appendChild(t);
+            setTimeout(() => {
+                t.classList.add('toast-out');
+                setTimeout(() => t.remove(), 200);
+            }, 3200);
+        }
 
+        // ── Map ───────────────────────────────────────────────────────
+        const MAP_KEY = 'puresky_map_v2';
         function saveMapState() {
-            const center = map.getCenter();
-            sessionStorage.setItem(MAP_STORAGE_KEY, JSON.stringify({
-                lat: center.lat, lng: center.lng, zoom: map.getZoom()
-            }));
+            const c = map.getCenter();
+            sessionStorage.setItem(MAP_KEY, JSON.stringify({ lat: c.lat, lng: c.lng, zoom: map.getZoom() }));
         }
+        function getMapView() { try { return JSON.parse(sessionStorage.getItem(MAP_KEY)); } catch(e) { return null; } }
 
-        function getInitialMapView() {
-            try { return JSON.parse(sessionStorage.getItem(MAP_STORAGE_KEY)); } catch(e) { return null; }
-        }
-
-        const savedView = getInitialMapView();
-        const map = L.map('map').setView(
+        const savedView = getMapView();
+        const map = L.map('map', { zoomControl: true }).setView(
             savedView ? [savedView.lat, savedView.lng] : [38.7223, -9.1393],
             savedView ? savedView.zoom : 10
         );
         map.on('moveend zoomend', saveMapState);
-        
+
+        // Mostrar coordenadas na barra inferior ao mover o rato
+        const coordBar = document.getElementById('coord-bar');
+        map.on('mousemove', (e) => {
+            coordBar.textContent = `${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}`;
+        });
+        map.on('mouseout', () => { coordBar.textContent = '—'; });
+
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            attribution: '&copy; OSM &copy; CARTO',
             subdomains: 'abcd',
             maxZoom: 20
         }).addTo(map);
-        
+
         const reportsData = {{ reports_json|safe }};
         const markers = [];
-        
-        reportsData.forEach((report) => {
-            let fillColor = '#10b981';
-            if (report.aqi_value >= 100) fillColor = '#ef4444';
-            else if (report.aqi_value >= 50) fillColor = '#f59e0b';
-            
-            const marker = L.circleMarker(
-                [report.latitude, report.longitude],
-                {
-                    radius: 6,
-                    fillColor: fillColor,
-                    color: fillColor,
-                    weight: 1,
-                    opacity: 0.6,
-                    fillOpacity: 0.5
-                }
-            ).addTo(map);
-            
-            const date = new Date(report.created_at);
-            const fmt = fmtDate(date);
-            
-            marker.bindPopup(`
-                <div style="font-size:13px;line-height:1.6">
-                    <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:2px;margin-bottom:6px">Relatório</div>
-                    <div style="font-size:20px;font-weight:800;color:${fillColor};margin-bottom:4px">AQI ${report.aqi_value.toFixed(0)}</div>
-                    <div style="color:#94a3b8;font-size:12px">${fmt}</div>
-                    <div style="color:#475569;font-size:11px;font-family:monospace;margin-top:4px">${report.latitude.toFixed(5)}, ${report.longitude.toFixed(5)}</div>
-                    <div style="color:#64748b;font-size:10px;margin-top:4px;font-family:monospace;letter-spacing:1px">🔑 ${getAgentCodename(report.device_id)}</div>
-                </div>
-            `);
-            
-            markers.push(marker);
+        const markerMap = new Map(); // report.id → L.circleMarker
+
+        reportsData.forEach(report => {
+            let color = '#22c55e';
+            if (report.aqi_value >= 100) color = '#ef4444';
+            else if (report.aqi_value >= 50) color = '#facc15';
+
+            const m = L.circleMarker([report.latitude, report.longitude], {
+                radius: 5, fillColor: color, color: color, weight: 1, opacity: 0.7, fillOpacity: 0.55
+            }).addTo(map);
+
+            const d = new Date(report.created_at);
+            m.bindPopup(makePopup(report, color, fmtDate(d)), { autoPan: false });
+            markers.push(m);
+            markerMap.set(report.id, m);
         });
-        
+
         if (markers.length > 0 && !savedView) {
-            map.fitBounds(new L.featureGroup(markers).getBounds().pad(0.1));
-        }
-        
-        // ── Formatação de data idêntica ao Django d/m H:i:s (sem vírgula)
-        function fmtDate(d) {
-            const dd = String(d.getDate()).padStart(2, '0');
-            const mm = String(d.getMonth() + 1).padStart(2, '0');
-            const hh = String(d.getHours()).padStart(2, '0');
-            const mi = String(d.getMinutes()).padStart(2, '0');
-            const ss = String(d.getSeconds()).padStart(2, '0');
-            return `${dd}/${mm} ${hh}:${mi}:${ss}`;
+            map.fitBounds(new L.featureGroup(markers).getBounds().pad(0.12));
         }
 
-        // ── Spy codenames
+        function makePopup(report, color, fmt) {
+            return `<div style="font-size:13px;line-height:1.7;min-width:180px">
+                <div style="font-size:10px;color:#52525b;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px;font-family:'JetBrains Mono',monospace">${getAgentCodename(report.device_id)}</div>
+                <div style="font-size:22px;font-weight:700;color:${color};letter-spacing:-.5px;margin-bottom:2px">AQI ${Math.round(report.aqi_value)}</div>
+                <div style="color:#71717a;font-size:12px;margin-bottom:6px">${fmt}</div>
+                <div style="color:#3f3f46;font-size:11px;font-family:'JetBrains Mono',monospace">${report.latitude.toFixed(5)}, ${report.longitude.toFixed(5)}</div>
+            </div>`;
+        }
+
+        // ── Formatação de data (sem vírgula) ──────────────────────────
+        function fmtDate(d) {
+            const p = n => String(n).padStart(2,'0');
+            return `${p(d.getDate())}/${p(d.getMonth()+1)} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+        }
+
+        // ── Codinomes ─────────────────────────────────────────────────
         function getAgentCodename(deviceId) {
             const OPS = ['PHANTOM','COBALT','VIPER','RAVEN','CIPHER','GHOST','SPECTRE','ECHO','NOVA','ATLAS'];
             let h = 5381;
-            for (let i = 0; i < deviceId.length; i++) {
-                h = (((h << 5) + h) ^ deviceId.charCodeAt(i)) & 0xffffffff;
-            }
+            for (let i = 0; i < deviceId.length; i++) h = (((h << 5) + h) ^ deviceId.charCodeAt(i)) & 0xffffffff;
             const abs = Math.abs(h);
-            return OPS[abs % OPS.length] + '-' + String(Math.floor(abs / OPS.length) % 100).padStart(2, '0');
+            return OPS[abs % OPS.length] + '-' + String(Math.floor(abs / OPS.length) % 100).padStart(2,'0');
         }
 
-        // Fill codenames for server-rendered rows
         document.querySelectorAll('tr[data-device-id]').forEach(tr => {
             const cell = tr.querySelector('.codename-cell');
             if (cell) cell.textContent = getAgentCodename(tr.dataset.deviceId);
         });
 
-        // ── SSE live updates (substitui reload de 30s) ────────────────
+        // Clicar numa linha foca o ponto correspondente no mapa
+        document.getElementById('telemetry-tbody').addEventListener('click', function(e) {
+            if (e.target.closest('button')) return;
+            const tr = e.target.closest('tr[data-lat]');
+            if (!tr) return;
+            const lat = parseFloat(tr.dataset.lat);
+            const lng = parseFloat(tr.dataset.lng);
+            if (isNaN(lat) || isNaN(lng)) return;
+            const id = tr.dataset.id ? parseInt(tr.dataset.id) : null;
+            const targetMarker = (id && markerMap.has(id)) ? markerMap.get(id) : null;
+            document.getElementById('map').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            map.closePopup();
+            map.setView([lat, lng], 16, { animate: true, duration: 0.5 });
+            if (targetMarker) {
+                setTimeout(() => targetMarker.openPopup(), 550);
+            }
+        });
+
+        // ── SSE live updates ──────────────────────────────────────────
         let pingCount = parseInt(document.getElementById('stat-pings')?.textContent || '0', 10);
 
         function flashLiveDot() {
             const dot = document.getElementById('live-dot');
             if (!dot) return;
-            dot.style.transition = 'background-color 0.15s';
-            dot.style.backgroundColor = '#ffffff';
-            setTimeout(() => { dot.style.backgroundColor = '#10b981'; }, 300);
+            dot.style.background = '#ffffff';
+            setTimeout(() => { dot.style.background = '#22c55e'; }, 280);
         }
 
         function prependTableRow(report) {
-            const tbody = document.querySelector('tbody');
+            const tbody = document.getElementById('telemetry-tbody');
             if (!tbody) return;
-
-            // Remove "sem dados" placeholder if present
-            if (tbody.rows[0]?.cells[0]?.colSpan > 4) tbody.deleteRow(0);
+            const emptyRow = document.getElementById('empty-row');
+            if (emptyRow) emptyRow.remove();
 
             const aqi = report.aqi_value;
-            let aqiClass = 'bg-emerald-500/15 text-emerald-400';
-            let statusText = 'Bom'; let statusClass = 'text-emerald-500/70';
-            if (aqi >= 100) { aqiClass = 'bg-red-500/15 text-red-400'; statusText = 'Mau'; statusClass = 'text-red-500/70'; }
-            else if (aqi >= 50) { aqiClass = 'bg-amber-500/15 text-amber-400'; statusText = 'Moderado'; statusClass = 'text-amber-500/70'; }
+            let badge = 'badge-good';
+            if (aqi >= 100) badge = 'badge-bad';
+            else if (aqi >= 50) badge = 'badge-moderate';
 
-            const date = new Date(report.created_at);
-            const fmt = fmtDate(date);
+            const fmt = fmtDate(new Date(report.created_at));
             const model = report.device_info?.model || '—';
-            const os = report.device_info?.os || '';
-            const osVer = report.device_info?.osVersion || '';
+            const os = (report.device_info?.os || '') + ' ' + (report.device_info?.osVersion || '');
             const codename = getAgentCodename(report.device_id);
 
             const tr = document.createElement('tr');
-            tr.className = 'table-row transition-colors';
+            tr.className = 'table-row';
             tr.dataset.deviceId = report.device_id;
-            tr.style.cssText = 'opacity:0;transform:translateY(-8px);transition:opacity 0.4s,transform 0.4s';
+            tr.dataset.lat = report.latitude;
+            tr.dataset.lng = report.longitude;
+            tr.dataset.id = report.id;
+            tr.style.cssText = 'opacity:0;transform:translateY(-6px);transition:opacity 0.35s ease,transform 0.35s ease;border-bottom:1px solid rgba(255,255,255,0.035);';
             tr.innerHTML = `
-                <td class="px-4 py-3 text-xs text-slate-400 font-mono">${fmt}</td>
-                <td class="px-4 py-3 text-xs text-slate-400 font-mono">${report.device_id.substring(0,15)}…</td>
-                <td class="px-4 py-3 text-[11px] font-mono font-bold text-emerald-500/70 codename-cell">${codename}</td>
-                <td class="px-4 py-3">
-                    <div><span class="text-xs font-medium text-slate-300">${model}</span>
-                    <span class="text-[10px] text-slate-600 ml-1.5">${os} ${osVer}</span></div>
+                <td style="padding:10px 16px;font-size:12px;color:#a1a1aa;font-family:'JetBrains Mono',monospace;white-space:nowrap;">${fmt}</td>
+                <td style="padding:10px 16px;font-size:11px;color:#71717a;font-family:'JetBrains Mono',monospace;">${report.device_id.substring(0,15)}…</td>
+                <td style="padding:10px 16px;font-size:11px;font-family:'JetBrains Mono',monospace;font-weight:600;color:#4ade80;opacity:.8;" class="codename-cell">${codename}</td>
+                <td style="padding:10px 16px;">
+                    <span style="font-size:12px;color:#a1a1aa;font-weight:500;">${model}</span>
+                    <span style="font-size:10px;color:#52525b;margin-left:6px;">${os.trim()}</span>
                 </td>
-                <td class="px-4 py-3 text-xs text-slate-500 font-mono">${report.latitude.toFixed(4)}</td>
-                <td class="px-4 py-3 text-xs text-slate-500 font-mono">${report.longitude.toFixed(4)}</td>
-                <td class="px-4 py-3"><span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold ${aqiClass}">${Math.round(aqi)}</span></td>
-                <td class="px-4 py-3"><span class="text-[11px] ${statusClass}">${statusText}</span></td>
-                <td class="px-4 py-3">
+                <td style="padding:10px 16px;font-size:11px;color:#64748b;font-family:'JetBrains Mono',monospace;">${report.latitude.toFixed(5)}</td>
+                <td style="padding:10px 16px;font-size:11px;color:#64748b;font-family:'JetBrains Mono',monospace;">${report.longitude.toFixed(5)}</td>
+                <td style="padding:10px 16px;"><span class="${badge}">${Math.round(aqi)}</span></td>
+                <td style="padding:10px 12px;text-align:right;">
                     <button onclick="deleteReport(${report.id}, this)"
-                            class="text-slate-700 hover:text-red-400 transition-colors p-1 rounded-lg hover:bg-red-500/10"
-                            title="Apagar">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                        </svg>
+                            style="background:none;border:none;cursor:pointer;color:#52525b;padding:4px 6px;border-radius:5px;transition:color .15s,background .15s;"
+                            onmouseover="this.style.color='#f87171';this.style.background='rgba(239,68,68,0.08)'"
+                            onmouseout="this.style.color='#52525b';this.style.background='none'"
+                            title="Apagar registo">
+                        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
                     </button>
                 </td>
             `;
             tbody.insertBefore(tr, tbody.firstChild);
             requestAnimationFrame(() => { tr.style.opacity = '1'; tr.style.transform = 'translateY(0)'; });
-            // Trim to 500 rows
             while (tbody.rows.length > 500) tbody.deleteRow(tbody.rows.length - 1);
         }
 
@@ -529,86 +584,96 @@
         evtSource.addEventListener('message', (e) => {
             const report = JSON.parse(e.data);
 
-            // Update stats
             pingCount++;
             const pingStat = document.getElementById('stat-pings');
             if (pingStat) pingStat.textContent = pingCount;
             const lastTimeStat = document.getElementById('stat-last-time');
-            if (lastTimeStat) {
-                lastTimeStat.textContent = new Date(report.created_at).toLocaleTimeString('pt-PT');
-            }
+            if (lastTimeStat) lastTimeStat.textContent = fmtDate(new Date(report.created_at)).split(' ')[1];
 
-            // Add map marker
-            let fillColor = '#10b981';
-            if (report.aqi_value >= 100) fillColor = '#ef4444';
-            else if (report.aqi_value >= 50) fillColor = '#f59e0b';
+            let color = '#22c55e';
+            if (report.aqi_value >= 100) color = '#ef4444';
+            else if (report.aqi_value >= 50) color = '#facc15';
+
             const m = L.circleMarker([report.latitude, report.longitude], {
-                radius: 6, fillColor, color: fillColor, weight: 1, opacity: 0.6, fillOpacity: 0.5
+                radius: 5, fillColor: color, color: color, weight: 1, opacity: 0.7, fillOpacity: 0.55
             }).addTo(map);
-            const d = new Date(report.created_at);
-            const f = fmtDate(d);
-            m.bindPopup(`<div style="font-size:13px;line-height:1.6">
-                <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:2px;margin-bottom:6px">Relatório</div>
-                <div style="font-size:20px;font-weight:800;color:${fillColor};margin-bottom:4px">AQI ${Math.round(report.aqi_value)}</div>
-                <div style="color:#94a3b8;font-size:12px">${f}</div>
-                <div style="color:#475569;font-size:11px;font-family:monospace;margin-top:4px">${report.latitude.toFixed(5)}, ${report.longitude.toFixed(5)}</div>
-                <div style="color:#64748b;font-size:10px;margin-top:4px;font-family:monospace;letter-spacing:1px">🔑 ${getAgentCodename(report.device_id)}</div>
-            </div>`);
+            m.bindPopup(makePopup(report, color, fmtDate(new Date(report.created_at))), { autoPan: false });
             markers.push(m);
+            markerMap.set(report.id, m);
 
-            // Prepend row and flash dot
             prependTableRow(report);
             flashLiveDot();
-        });
-        evtSource.onerror = () => { /* EventSource auto-reconecta */ };
 
+            const codename = getAgentCodename(report.device_id);
+            showToast(`Novo ping — ${codename} · AQI ${Math.round(report.aqi_value)}`, 'success');
+        });
+        evtSource.onerror = () => {};
+
+        // ── Export CSV ────────────────────────────────────────────────
+        function exportCSV() {
+            const rows = [['id','device_id','latitude','longitude','aqi_value','created_at']];
+            document.querySelectorAll('#telemetry-tbody tr[data-device-id]').forEach(tr => {
+                const cells = tr.querySelectorAll('td');
+                if (cells.length < 7) return;
+                rows.push([
+                    '', // id não está na tabela visível
+                    tr.dataset.deviceId,
+                    cells[4].textContent.trim(),
+                    cells[5].textContent.trim(),
+                    cells[6].textContent.trim(),
+                    cells[0].textContent.trim(),
+                ]);
+            });
+            const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
+            const a = document.createElement('a');
+            a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+            a.download = `puresky_telemetry_${new Date().toISOString().slice(0,10)}.csv`;
+            a.click();
+            showToast('CSV exportado com sucesso', 'info');
+        }
+
+        // ── Delete ─────────────────────────────────────────────────────
         async function deleteReport(reportId, btn) {
-            if (!confirm(`Apagar registo #${reportId}?`)) return;
             btn.disabled = true;
             btn.style.opacity = '0.3';
             try {
                 const res = await fetch(`/api/v1/reports/${reportId}`, { method: 'DELETE' });
                 if (res.ok) {
                     const row = btn.closest('tr');
-                    row.style.transition = 'opacity 0.3s, transform 0.3s';
+                    row.style.transition = 'opacity 0.25s, transform 0.25s';
                     row.style.opacity = '0';
-                    row.style.transform = 'translateX(16px)';
-                    setTimeout(() => row.remove(), 300);
+                    row.style.transform = 'translateX(12px)';
+                    setTimeout(() => row.remove(), 250);
+                    showToast('Registo eliminado', 'info');
                 } else {
-                    alert('Erro ao apagar.');
-                    btn.disabled = false;
-                    btn.style.opacity = '1';
+                    showToast('Erro ao apagar registo', 'error');
+                    btn.disabled = false; btn.style.opacity = '1';
                 }
             } catch(e) {
-                alert('Erro de rede.');
-                btn.disabled = false;
-                btn.style.opacity = '1';
+                showToast('Erro de rede', 'error');
+                btn.disabled = false; btn.style.opacity = '1';
             }
         }
-        
+
         async function deleteAllReports(btn) {
-            if (!confirm('Apagar TODOS os registos? Irreversível.')) return;
-            btn.disabled = true;
-            btn.style.opacity = '0.3';
+            if (!confirm('Apagar TODOS os registos? Esta acção é irreversível.')) return;
+            btn.disabled = true; btn.style.opacity = '0.4';
             try {
                 const res = await fetch('/api/v1/reports/all', { method: 'DELETE' });
                 if (res.ok) {
-                    const tbody = document.querySelector('tbody');
-                    if (tbody) {
-                        tbody.innerHTML = '<tr><td colspan="9" class="px-4 py-12 text-center text-slate-600 text-sm">Sem dados. A aguardar primeiro ping…</td></tr>';
-                    }
-                    btn.style.opacity = '1';
-                    btn.disabled = false;
+                    const tbody = document.getElementById('telemetry-tbody');
+                    if (tbody) tbody.innerHTML = '<tr id="empty-row"><td colspan="8" style="padding:56px 16px;text-align:center;font-size:13px;color:#52525b;">Sem dados. A aguardar primeiro ping…</td></tr>';
+                    pingCount = 0;
+                    const ps = document.getElementById('stat-pings');
+                    if (ps) ps.textContent = '0';
+                    showToast('Todos os registos eliminados', 'warning');
                 } else {
-                    alert('Erro ao apagar.');
-                    btn.disabled = false;
-                    btn.style.opacity = '1';
+                    showToast('Erro ao apagar registos', 'error');
                 }
             } catch(e) {
-                alert('Erro de rede.');
-                btn.disabled = false;
-                btn.style.opacity = '1';
+                showToast('Erro de rede', 'error');
             }
+            btn.disabled = false; btn.style.opacity = '1';
         }
     </script>
     

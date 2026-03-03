@@ -61,13 +61,26 @@ docker-compose up --build
 O Docker Compose irá:
 1. Iniciar o PostgreSQL e aguardar o healthcheck
 2. Executar `python manage.py migrate` automaticamente
-3. Iniciar o servidor Django em `http://localhost:8000`
+3. Executar `python manage.py seed` — popula a base de dados com **45 pings de demo** traçando uma rota por Porto (Ribeira → Clérigos → Bonfim → Campanhã). Seguro de repetir: não duplica dados.
+4. Iniciar o servidor Django em `http://localhost:8000`
 
 ### 3. Verificar que está a funcionar
 
 ```
 http://localhost:8000/api/docs         → Swagger UI (Django Ninja)
 http://localhost:8000/       → Dashboard de telemetria (Leaflet map)
+```
+
+### 4. (Opcional) Re-seed dos dados de demo
+
+O seed corre automaticamente no arranque, mas pode ser executado manualmente:
+
+```bash
+# Dentro do container
+docker-compose exec backend python manage.py seed
+
+# Com reset completo (apaga todos os reports antes de re-popular)
+docker-compose exec backend python manage.py seed --flush
 ```
 
 ---
@@ -163,6 +176,8 @@ Acessível em `http://localhost:8000/`:
 │       ├── api.py               # Endpoints REST (Ninja)
 │       ├── models.py            # AirQualityReport
 │       ├── views.py             # Dashboard HTML
+│       ├── management/
+│       │   └── commands/seed.py # Seeder com 45 pings de Porto
 │       └── templates/
 │           └── reports/dashboard.html
 └── app/                         # React Native (Expo)
@@ -194,7 +209,11 @@ Acessível em `http://localhost:8000/`:
 | Método | Endpoint | Descrição |
 |---|---|---|
 | `POST` | `/api/v1/ping` | Receber telemetria de um dispositivo |
-| `GET` | `/api/v1/history` | Listar todos os registos |
+| `GET` | `/api/v1/history` | Listar todos os registos (com filtros opcionais) |
+| `GET` | `/api/v1/history/geojson` | Trajetória em formato GeoJSON (Points + LineString) |
+| `GET` | `/api/v1/last-known-location` | Última localização conhecida (por device_id opcional) |
+| `GET` | `/api/v1/stats` | Estatísticas agregadas |
+| `GET` | `/api/v1/devices` | Lista de dispositivos únicos |
 | `DELETE` | `/api/v1/reports/{id}` | Eliminar registo individual |
 | `DELETE` | `/api/v1/reports/all` | Eliminar todos os registos |
 | `GET` | `/api/docs` | Swagger UI interactivo |

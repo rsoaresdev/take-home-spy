@@ -46,7 +46,8 @@ export const defineBackgroundTask = (): void => {
         const uplinkState = await AsyncStorage.getItem(UPLINK_STORAGE_KEY);
         if (uplinkState !== "true") return;
 
-        const { latitude, longitude } = locations[0].coords;
+        // Use the most recent location (last element — array is oldest-first)
+        const { latitude, longitude } = locations[locations.length - 1].coords;
         console.log(
           `📍 BG location: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`,
         );
@@ -66,8 +67,64 @@ export const defineBackgroundTask = (): void => {
   console.log("✅ Background task definida:", BACKGROUND_TASK_NAME);
 };
 
+// Foreground fallback interval handle (used when background permission is unavailable)
+let _foregroundIntervalId: ReturnType<typeof setInterval> | null = null;
+
+function _stopForegroundFallback(): void {
+  if (_foregroundIntervalId) {
+    clearInterval(_foregroundIntervalId);
+    _foregroundIntervalId = null;
+    console.log("🛑 Foreground fallback parado");
+  }
+}
+
+/**
+ * Fallback quando a permissão de background é negada.
+ * Usa setInterval + getCurrentPositionAsync enquanto a app está em foreground.
+ */
+async function _startForegroundFallback(): Promise<void> {
+  _stopForegroundFallback();
+  try {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== "granted") {
+      console.warn("⚠️ Permissão de foreground negada — tracking inativo.");
+      return;
+    }
+
+    const send = async () => {
+      try {
+        const uplinkState = await AsyncStorage.getItem(UPLINK_STORAGE_KEY);
+        if (uplinkState !== "true") return;
+
+        const now = Date.now();
+        const last = await AsyncStorage.getItem(LAST_PING_KEY);
+        if (last && now - parseInt(last, 10) < THROTTLE_MS) return;
+
+        const loc = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        const { latitude, longitude } = loc.coords;
+        console.log(`📍 FG fallback: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`);
+        await sendAirQualityReport(latitude, longitude);
+        await AsyncStorage.setItem(LAST_PING_KEY, String(now));
+        console.log(`✅ FG fallback sync @ ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+      } catch (err) {
+        console.warn("⚠️ FG fallback erro:", err instanceof Error ? err.message : String(err));
+      }
+    };
+
+    // Send immediately on first activation, then repeat
+    await send();
+    _foregroundIntervalId = setInterval(send, MIN_INTERVAL_MS);
+    console.log("🚀 Foreground fallback iniciado (interval:", MIN_INTERVAL_MS, "ms)");
+  } catch (error) {
+    console.error("❌ Erro ao iniciar foreground fallback:", error);
+  }
+}
+
 /**
  * Inicia localização em background.
+ * Se a permissão de background for negada (ou Expo Go), ativa o foreground fallback.
  */
 export const startBackgroundLocationTracking = async (): Promise<void> => {
   if (Platform.OS === "web") return;
@@ -75,10 +132,13 @@ export const startBackgroundLocationTracking = async (): Promise<void> => {
   try {
     const { status } = await Location.requestBackgroundPermissionsAsync();
     if (status !== "granted") {
-      console.warn("⚠️ Permissão de background negada.");
+      console.warn("⚠️ Permissão de background negada — a ativar foreground fallback.");
+      await _startForegroundFallback();
       return;
     }
     console.log("✅ Permissão de background:", status);
+
+    _stopForegroundFallback();
 
     const isRegistered =
       await TaskManager.isTaskRegisteredAsync(BACKGROUND_TASK_NAME);
@@ -109,14 +169,17 @@ export const startBackgroundLocationTracking = async (): Promise<void> => {
     console.log("🚀 Background location tracking iniciado");
   } catch (error) {
     console.error("❌ Erro ao iniciar background task:", error);
+    // Last resort: try foreground fallback
+    await _startForegroundFallback();
   }
 };
 
 /**
- * Parar o tracking
+ * Parar o tracking (background + foreground fallback)
  */
 export const stopBackgroundLocationTracking = async (): Promise<void> => {
   if (Platform.OS === "web") return;
+  _stopForegroundFallback();
   try {
     const isRegistered =
       await TaskManager.isTaskRegisteredAsync(BACKGROUND_TASK_NAME);

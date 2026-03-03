@@ -205,3 +205,89 @@ def get_devices(request):
     )
 
     return {"devices": list(devices)}
+
+
+@api.get("/history/geojson", tags=["Data Retrieval"])
+def get_history_geojson(
+    request,
+    device_id: Optional[str] = None,
+    limit: int = 500,
+):
+    """
+    Retorna o histórico de localização em formato GeoJSON (FeatureCollection).
+    Compatível com qualquer cliente de mapas (Leaflet, Mapbox, QGIS, etc.).
+    """
+    queryset = AirQualityReport.objects.all()
+
+    if device_id:
+        queryset = queryset.filter(device_id=device_id)
+
+    queryset = queryset.order_by("created_at")[:limit]
+
+    features = [
+        {
+            "type": "Feature",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [r["longitude"], r["latitude"]],
+            },
+            "properties": {
+                "id": r["id"],
+                "device_id": r["device_id"],
+                "aqi_value": r["aqi_value"],
+                "created_at": r["created_at"].isoformat(),
+            },
+        }
+        for r in queryset.values(
+            "id", "device_id", "latitude", "longitude", "aqi_value", "created_at"
+        )
+    ]
+
+    # Se houver pelo menos 2 pontos, adicionar também uma LineString com a trajetória
+    if len(features) >= 2:
+        coords = [f["geometry"]["coordinates"] for f in features]
+        features.append(
+            {
+                "type": "Feature",
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": coords,
+                },
+                "properties": {
+                    "device_id": device_id or "all",
+                    "point_count": len(coords),
+                },
+            }
+        )
+
+    return {
+        "type": "FeatureCollection",
+        "features": features,
+    }
+
+
+@api.get("/last-known-location", tags=["Data Retrieval"])
+def get_last_known_location(request, device_id: Optional[str] = None):
+    """
+    Retorna a última localização conhecida.
+    Se device_id for fornecido, filtra por dispositivo; caso contrário devolve o ping mais recente de qualquer dispositivo.
+    """
+    queryset = AirQualityReport.objects.all()
+
+    if device_id:
+        queryset = queryset.filter(device_id=device_id)
+
+    last = queryset.order_by("-created_at").first()
+
+    if last is None:
+        from ninja.errors import HttpError
+        raise HttpError(404, "Nenhuma localização encontrada")
+
+    return {
+        "device_id": last.device_id,
+        "latitude": last.latitude,
+        "longitude": last.longitude,
+        "aqi_value": last.aqi_value,
+        "created_at": last.created_at,
+        "device_info": last.device_info,
+    }

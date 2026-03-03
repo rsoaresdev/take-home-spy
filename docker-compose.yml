@@ -19,6 +19,7 @@ services:
     container_name: puresky_backend
     command: >
       sh -c "python manage.py migrate &&
+             python manage.py seed &&
              gunicorn core.wsgi:application --bind 0.0.0.0:8000 --workers 4 --timeout 0 --worker-tmp-dir /dev/shm"
     env_file:
       - .env

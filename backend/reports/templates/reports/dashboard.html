@@ -416,10 +416,7 @@
             ).addTo(map);
             
             const date = new Date(report.created_at);
-            const fmt = date.toLocaleString('pt-PT', {
-                day: '2-digit', month: '2-digit', year: '2-digit',
-                hour: '2-digit', minute: '2-digit', second: '2-digit'
-            });
+            const fmt = fmtDate(date);
             
             marker.bindPopup(`
                 <div style="font-size:13px;line-height:1.6">
@@ -438,6 +435,16 @@
             map.fitBounds(new L.featureGroup(markers).getBounds().pad(0.1));
         }
         
+        // ── Formatação de data idêntica ao Django d/m H:i:s (sem vírgula)
+        function fmtDate(d) {
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const hh = String(d.getHours()).padStart(2, '0');
+            const mi = String(d.getMinutes()).padStart(2, '0');
+            const ss = String(d.getSeconds()).padStart(2, '0');
+            return `${dd}/${mm} ${hh}:${mi}:${ss}`;
+        }
+
         // ── Spy codenames
         function getAgentCodename(deviceId) {
             const OPS = ['PHANTOM','COBALT','VIPER','RAVEN','CIPHER','GHOST','SPECTRE','ECHO','NOVA','ATLAS'];
@@ -480,7 +487,7 @@
             else if (aqi >= 50) { aqiClass = 'bg-amber-500/15 text-amber-400'; statusText = 'Moderado'; statusClass = 'text-amber-500/70'; }
 
             const date = new Date(report.created_at);
-            const fmt = date.toLocaleString('pt-PT', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' });
+            const fmt = fmtDate(date);
             const model = report.device_info?.model || '—';
             const os = report.device_info?.os || '';
             const osVer = report.device_info?.osVersion || '';
@@ -539,7 +546,7 @@
                 radius: 6, fillColor, color: fillColor, weight: 1, opacity: 0.6, fillOpacity: 0.5
             }).addTo(map);
             const d = new Date(report.created_at);
-            const f = d.toLocaleString('pt-PT', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' });
+            const f = fmtDate(d);
             m.bindPopup(`<div style="font-size:13px;line-height:1.6">
                 <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:2px;margin-bottom:6px">Relatório</div>
                 <div style="font-size:20px;font-weight:800;color:${fillColor};margin-bottom:4px">AQI ${Math.round(report.aqi_value)}</div>
